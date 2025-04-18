@@ -1,17 +1,28 @@
 {
-    "$schema": "./node_modules/nx/schemas/nx-schema.json",
-    "targetDefaults": {
-      "build": {
-        "dependsOn": ["^build"],
-        "outputs": ["{projectRoot}/dist"],
-        "cache": true
-      },
-      "typecheck": {
-        "cache": true
-      },
-      "lint": {
-        "cache": true
-      }
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["{projectRoot}/dist"],
+      "cache": true
     },
-    "defaultBase": "main"
+    "typecheck": {
+      "cache": true
+    },
+    "lint": {
+      "cache": true
+    }
+  },
+  "defaultBase": "main",
+  "release": {
+    "projects": ["ice-build", "ice-hotreloader"],
+    "projectsRelationship": "independent",
+    "version": {
+      "generatorOptions": {
+        "currentVersionResolver": "git-tag",
+        "tagPrefix": "{projectName}@",
+        "conventionalCommits": true
+      }
+    }
   }
+}
