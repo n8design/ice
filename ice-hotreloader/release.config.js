@@ -29,12 +29,5 @@ module.exports = {
     }]
   ],
   pkgRoot: "ice-hotreloader",
-  extends: "semantic-release-monorepo",
-  "version": {
-    "executor": "@nx/release:semantic-version",
-    "dependsOn": ["lint", "build"],
-    "options": {
-      "preset": "conventional"
-    }
-  }
+  extends: "semantic-release-monorepo"
 };
