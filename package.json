@@ -1,0 +1,31 @@
+{
+  "name": "ice",
+  "version": "0.0.1",
+  "description": "Contains all built chain an tool for hTWOo",
+  "private": true,
+  "workspaces": [
+    "ice-*"
+  ],
+  "keywords": [
+    "Ice",
+    "Build",
+    "Chain",
+    "Tools",
+    "hTWOo"
+  ],
+  "homepage": "https://github.com/n8design/ice#readme",
+  "bugs": {
+    "url": "https://github.com/n8design/ice/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/n8design/ice.git"
+  },
+  "license": "MIT",
+  "author": "Stefan Bauer",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
