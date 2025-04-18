@@ -169,3 +169,6 @@ tsconfig.tsbuildinfo
 # Uncomment if using this approach
 # src/**/*.js
 # src/**/*.jsx
+
+# Nx
+.nx/
