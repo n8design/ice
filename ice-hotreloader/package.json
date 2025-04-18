@@ -1,0 +1,37 @@
+{
+  "name": "@n8d/ice-hotreloader",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:node && npm run build:browser",
+    "build:node": "tsc",
+    "build:browser": "esbuild src/browser.ts --bundle --minify --sourcemap --outfile=dist/browser.min.js --format=iife --target=es2020",
+    "lint": "eslint ."
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "patternlab",
+    "hmr",
+    "hot-reload"
+  ],
+  "dependencies": {
+    "ws": "^8.x"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.x",
+    "typescript": "^5.x",
+    "@types/node": "^20.x",
+    "esbuild": "^0.19.x"
+  }
+}

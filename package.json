@@ -1,5 +1,5 @@
 {
-  "name": "ice",
+  "name": "@n8d/ice",
   "version": "0.0.1",
   "description": "Contains all built chain an tool for hTWOo",
   "private": true,
@@ -26,6 +26,17 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build:ice": "npm run build --workspace ice-build",
+    "watch:ice": "npm run watch --workspace ice-build",
+    "build:hotreloader": "npm run build --workspace ice-hotreloader",
+    "watch:hotreloader": "npm run build --workspace ice-hotreloader",
+    "build": "npm-run-all build:ice build:hotreloader",
+    "watch": "npm-run-all watch:ice watch:hotreloader"
+  },
+  "dependencies": {
+    "npm-run-all": "^4.1.5"
+  },
+  "devDependencies": {
+    "@nx/js": "^20.8.0"
   }
 }
