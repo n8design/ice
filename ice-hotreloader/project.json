@@ -41,14 +41,6 @@
           "create": true,
           "file": "CHANGELOG.md",
           "scopes": ["ice-hotreloader"]
-        },
-        "commits": {
-          "include": ["**/ice-hotreloader/**"],
-          "filter": [
-            "ice-hotreloader",
-            "ice-hotreloader/**",
-            "ice-hotreloader/**/*"
-          ]
         }
       }
     },
