@@ -97,4 +97,4 @@ Watches files for changes and automatically rebuilds the project when changes ar
 
 ## License
 
-MIT
+MIT# Added feature documentation
