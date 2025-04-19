@@ -27,6 +27,10 @@
         "skipCommitTypes": ["chore", "docs"],
         "changelogHeader": "# Changelog",
         "releaseTagPattern": "{projectName}@{version}",
+        "commitMessageFormat": "chore(release): {projectName}@{version} [skip ci]",
+        "github": {
+          "release": false
+        },
         "git": {
           "commit": true,
           "tag": true,
@@ -34,7 +38,16 @@
         },
         "changelog": {
           "create": true,
-          "file": "CHANGELOG.md"
+          "file": "CHANGELOG.md",
+          "scopes": ["ice-build"] 
+        },
+        "commits": {
+          "include": ["**/ice-build/**"],
+          "filter": [
+            "ice-build",
+            "ice-build/**",
+            "ice-build/**/*"
+          ]
         }
       }
     },

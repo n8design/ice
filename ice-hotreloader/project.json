@@ -28,6 +28,10 @@
         "skipCommitTypes": ["chore", "docs"],
         "changelogHeader": "# Changelog",
         "releaseTagPattern": "{projectName}@{version}",
+        "commitMessageFormat": "chore(release): {projectName}@{version} [skip ci]",
+        "github": {
+          "release": false
+        },
         "git": {
           "commit": true,
           "tag": true,
@@ -35,7 +39,16 @@
         },
         "changelog": {
           "create": true,
-          "file": "CHANGELOG.md"
+          "file": "CHANGELOG.md",
+          "scopes": ["ice-hotreloader"]
+        },
+        "commits": {
+          "include": ["**/ice-hotreloader/**"],
+          "filter": [
+            "ice-hotreloader",
+            "ice-hotreloader/**",
+            "ice-hotreloader/**/*"
+          ]
         }
       }
     },
