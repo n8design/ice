@@ -14,7 +14,7 @@
   },
   "main": "build.ts",
   "bin": {
-    "ice-build": "tsx ./bin/cli.js"
+    "ice-build": "./bin/cli.js"
   },
   "files": [
     "bin",

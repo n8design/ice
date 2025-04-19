@@ -54,5 +54,3 @@
 * **ice-hotreloader:** initial feature implementation ([f07f665](https://github.com/n8design/ice/commit/f07f6655dfde9ec1a26cf6c1184cab730328ab1b))
 
 
-
-# Changelog
