@@ -2,7 +2,7 @@
 
 `@n8d/ice-hotreloader` provides a lightweight WebSocket server designed to facilitate Hot Module Reloading (HMR) or live reloading for frontend development environments. It works in conjunction with build tools like `@n8d/ice-build` or other systems that can trigger reload messages.
 
-![hTWOo Iced Logo](./asset/frozen.htwoo.webp)
+![hTWOo Iced Logo](https://raw.githubusercontent.com/n8design/ice/refs/heads/main/assets/frozen-htwoo.webp)
 
 ## Overview
 

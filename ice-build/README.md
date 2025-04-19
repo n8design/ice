@@ -2,6 +2,8 @@
 
 `@n8d/ice-build` is a command-line tool designed to streamline the build process for frontend projects, integrating Sass compilation, JavaScript bundling with esbuild, and optional hot module reloading via `@n8d/ice-hotreloader`.
 
+![hTWOo Iced Logo](https://raw.githubusercontent.com/n8design/ice/refs/heads/main/assets/frozen-htwoo.webp)
+
 ## Overview
 
 This utility simplifies common frontend build tasks:

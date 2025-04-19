@@ -2,7 +2,7 @@
 
 This repository contains the `ice` project, a monorepo managed with Nx, housing tools designed to streamline frontend development workflows, particularly focusing on build processes and hot reloading.
 
-![hTWOo Iced Logo](./asset/frozen.htwoo.webp)
+![hTWOo Iced Logo](https://raw.githubusercontent.com/n8design/ice/refs/heads/main/assets/frozen-htwoo.webp)
 
 ## Workspace Structure
 
