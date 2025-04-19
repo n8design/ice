@@ -39,15 +39,7 @@
         "changelog": {
           "create": true,
           "file": "CHANGELOG.md",
-          "scopes": ["ice-build"] 
-        },
-        "commits": {
-          "include": ["**/ice-build/**"],
-          "filter": [
-            "ice-build",
-            "ice-build/**",
-            "ice-build/**/*"
-          ]
+          "scopes": ["ice-build"]
         }
       }
     },
