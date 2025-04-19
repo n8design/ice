@@ -31,6 +31,10 @@
           "commit": true,
           "tag": true,
           "push": true
+        },
+        "changelog": {
+          "create": true,
+          "file": "CHANGELOG.md"
         }
       }
     },
@@ -39,7 +43,7 @@
       "dependsOn": ["build"],
       "options": {
         "packageRoot": "ice-build",
-        "publishable": true  // Change to true to enable publishing
+        "publishable": true  
       }
     }
   }

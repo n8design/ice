@@ -19,13 +19,6 @@
         "cwd": "ice-hotreloader"
       }
     },
-    "test": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "npm run test",
-        "cwd": "ice-hotreloader"
-      }
-    },
     "version": {
       "executor": "@nx/release:semantic-version",
       "options": {
@@ -39,7 +32,20 @@
           "commit": true,
           "tag": true,
           "push": true
+        },
+        "changelog": {
+          "create": true,
+          "file": "CHANGELOG.md"
         }
+      }
+    },
+    "nx-release-publish": {
+      "executor": "@nx/js:release-publish",
+      "dependsOn": ["build"],
+      "options": {
+        "packageRoot": "ice-hotreloader",
+        "publishable": true,
+        "access": "public"
       }
     }
   }
