@@ -1,8 +1,9 @@
 {
   "name": "@n8d/ice-build",
-  "version": "0.0.7-alpha.0",
+  "version": "0.0.4-alpha.4",
   "type": "module",
   "private": false,
+  "license": "MIT",
   "nx-release-publish": {
     "executor": "@nx/js:release-publish",
     "options": {
