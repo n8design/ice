@@ -33,5 +33,13 @@
     "typescript": "^5.x",
     "@types/node": "^20.x",
     "esbuild": "^0.19.x"
+  },
+  "nx-release-publish": {
+    "executor": "@nx/js:release-publish",
+    "options": {
+      "packageRoot": "ice-hotreloader",
+      "publishable": true,
+      "access": "public"
+    }
   }
 }

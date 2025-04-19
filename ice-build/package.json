@@ -2,6 +2,15 @@
   "name": "@n8d/ice-build",
   "version": "0.0.1-alpha.0",
   "type": "module",
+  "private": false,
+  "nx-release-publish": {
+    "executor": "@nx/js:release-publish",
+    "options": {
+      "packageRoot": "ice-build",
+      "publishable": true,
+      "access": "public"
+    }
+  },
   "main": "build.ts",
   "bin": {
     "ice-build": "tsx ./bin/cli.js"
