@@ -26,6 +26,10 @@
     "hmr",
     "hot-reload"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/n8design/ice.git"
+  },
   "dependencies": {
     "ws": "^8.x"
   },
