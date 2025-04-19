@@ -37,38 +37,49 @@ cd ice
 npm install
 ```
 
-### Building Packages
+### Building & Linting Packages
 
-You can build individual packages or all packages using Nx commands or npm scripts defined in the root `package.json`:
+Use the scripts defined in the root `package.json`:
 
 ```bash
-# Build ice-build
-nx build ice-build
-# or potentially: npm run build:ice-build
+# Build all packages (ice-build and ice-hotreloader)
+npm run build
 
-# Build ice-hotreloader
-nx build ice-hotreloader
-# or potentially: npm run build:ice-hotreloader
-
-# Build all packages (if configured)
-# nx run-many --target=build --all
-# or potentially: npm run build:all
+# Lint all packages (ice-build and ice-hotreloader)
+npm run lint
 ```
 
 ### Development
 
-Refer to the individual package READMEs for specific development workflows, such as running tests or watch modes.
+Refer to the individual package READMEs for specific development workflows, such as running tests or watch modes within those packages.
 
 ### Releasing
 
-This repository uses Nx for release management, including version bumping, changelog generation, and Git tagging. Release scripts are defined in the root `package.json`:
+This repository uses a combination of Nx (for version bumping) and custom scripts (for changelog, commit, tag, push) for release management. Release scripts are defined in the root `package.json`:
+
+**Alpha Releases:**
 
 ```bash
-# Example: Create a new alpha release for ice-build
+# Create a new alpha release for ice-build
 npm run release:alpha:ice-build
 
-# Example: Create a new alpha release for ice-hotreloader
+# Create a new alpha release for ice-hotreloader
 npm run release:alpha:ice-hotreloader
 ```
 
-These scripts handle the version bump, changelog update, commit, tag, and push operations for the specified package.
+**Stable Releases (Patch, Minor, Major):**
+
+Pass the desired release type (`patch`, `minor`, or `major`) after `--`.
+
+```bash
+# Create a stable patch release for ice-build
+npm run release:stable:ice-build -- patch
+
+# Create a stable minor release for ice-hotreloader
+npm run release:stable:ice-hotreloader -- minor
+
+# Create a stable major release for ice-build
+npm run release:stable:ice-build -- major
+```
+
+These scripts handle the version bump, changelog update, commit, tag, and push operations for the specified package and release type.
