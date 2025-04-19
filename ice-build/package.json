@@ -18,7 +18,8 @@
   "files": [
     "bin",
     "dist",
-    "src"
+    "src",
+    "assets"
   ],
   "scripts": {
     "build": "tsc",

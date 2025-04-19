@@ -1,100 +1,67 @@
-# Core Build Tool
+# Ice Build Tool
 
-A Node.js tool for building and managing core components of your project.
+`@n8d/ice-build` is a command-line tool designed to streamline the build process for frontend projects, integrating Sass compilation, JavaScript bundling with esbuild, and optional hot module reloading via `@n8d/ice-hotreloader`.
 
 ## Overview
 
-This utility helps you streamline the build process for core components by:
-- Compiling source files
-- Bundling assets
-- Minifying code
-- Generating source maps
-- Running tests
+This utility simplifies common frontend build tasks:
 
-
-
+-   **Sass Compilation:** Compiles `.scss` or `.sass` files into CSS using `esbuild-sass-plugin`.
+-   **PostCSS Integration:** Applies PostCSS transformations, including `autoprefixer`.
+-   **JavaScript Bundling:** Uses `esbuild` for fast JavaScript/TypeScript bundling and minification.
+-   **ESLint Integration:** Lints source files during the build process.
+-   **File Watching:** Monitors source files for changes and triggers rebuilds automatically.
+-   **Hot Module Reloading (HMR):** Integrates with `@n8d/ice-hotreloader` to push changes to connected clients without full page reloads (when watching).
 
 ## Installation
 
+Install the tool as a development dependency in your project:
+
 ```bash
-npm install --save-dev @n8d/core-build
+npm install --save-dev @n8d/ice-build @n8d/ice-hotreloader
+# or
+yarn add --dev @n8d/ice-build @n8d/ice-hotreloader
 ```
 
-## Directory Structure
-
-```
-core-build/
-├── src/               # Source files
-│   ├── components/
-│   ├── styles/
-│   └── scripts/
-├── dist/              # Distribution files
-├── build.js           # Build script
-├── package.json       # Project configuration
-└── README.md          # Project documentation
-```
+You might also need peer dependencies like `esbuild`, `sass`, `postcss`, `autoprefixer`, etc., depending on your specific configuration needs.
 
 ## Usage
 
+You can run the build tool via the command line or npm scripts.
+
+**Command Line:**
+
 ```bash
-core-build [options]
+# Run a single build
+npx ice-build --project=/path/to/your/project
+
+# Run in watch mode with HMR
+npx ice-build --project=/path/to/your/project --watch
 ```
 
-### Options
+**npm Scripts (Recommended):**
 
-| Option          | Description                                              |
-|-----------------|----------------------------------------------------------|
-| `-s, --source <path>` | Source directory (defaults to ./src)                     |
-| `-d, --dist <path>`   | Distribution directory (defaults to ./dist)              |
-| `-w, --watch`         | Watch files for changes and rebuild automatically        |
-| `-m, --minify`        | Minify the output files                                   |
-| `--sourcemaps`        | Generate source maps                                      |
-| `-h, --help`          | Show help message                                         |
+Add scripts to your project's `package.json`:
 
-### Examples
-
-**Build the project:**
-```bash
-core-build --source ./src --dist ./dist
+```json
+{
+  "scripts": {
+    "build": "ice-build",
+    "watch": "ice-build --watch"
+  }
+}
 ```
 
-**Watch files for changes and rebuild automatically:**
+Then run:
+
 ```bash
-core-build --watch
+# Run a single build
+npm run build
+
+# Run in watch mode
+npm run watch
 ```
 
-**Minify the output files:**
-```bash
-core-build --minify
-```
+**Configuration:**
 
-**Generate source maps:**
-```bash
-core-build --sourcemaps
-```
-
-## Features
-
-### Source Compilation
-
-The tool compiles source files from the specified source directory and outputs them to the distribution directory.
-
-### Asset Bundling
-
-Bundles assets such as JavaScript, CSS, and images into optimized files for production.
-
-### Code Minification
-
-Minifies the output files to reduce file size and improve load times.
-
-### Source Maps
-
-Generates source maps to help with debugging minified code.
-
-### File Watching
-
-Watches files for changes and automatically rebuilds the project when changes are detected.
-
-## License
-
-MIT# Added feature documentation
+The tool typically looks for source files within a `source` directory and outputs to a `dist` directory relative to the project path specified (or the current working directory if `--project` is omitted). Specific input/output paths and other options might be configurable via command-line arguments or a configuration file in future versions.
