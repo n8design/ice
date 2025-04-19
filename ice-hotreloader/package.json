@@ -18,7 +18,8 @@
     "lint": "eslint ."
   },
   "files": [
-    "dist"
+    "dist",
+    "assets"
   ],
   "keywords": [
     "patternlab",
