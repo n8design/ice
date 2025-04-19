@@ -9,7 +9,8 @@
       "options": {
         "command": "npm run build",
         "cwd": "ice-hotreloader"
-      }
+      },
+      "outputs": ["{projectRoot}/dist"]
     },
     "lint": {
       "executor": "nx:run-commands",
@@ -18,11 +19,27 @@
         "cwd": "ice-hotreloader"
       }
     },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run test",
+        "cwd": "ice-hotreloader"
+      }
+    },
     "version": {
       "executor": "@nx/release:semantic-version",
-      "dependsOn": ["lint", "build"],
       "options": {
-        "preset": "conventional"
+        "preset": "conventional",
+        "trackDeps": false,
+        "push": true,
+        "skipCommitTypes": ["chore", "docs"],
+        "changelogHeader": "# Changelog",
+        "releaseTagPattern": "{projectName}@{version}",
+        "git": {
+          "commit": true,
+          "tag": true,
+          "push": true
+        }
       }
     }
   }

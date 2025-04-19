@@ -15,13 +15,38 @@
   },
   "defaultBase": "main",
   "release": {
-    "projects": ["ice-build", "ice-hotreloader"],
     "projectsRelationship": "independent",
     "version": {
       "generatorOptions": {
         "currentVersionResolver": "git-tag",
         "tagPrefix": "{projectName}@",
+        "commitMessageFormat": "chore(release): {projectName}@{version} [skip ci]",
         "conventionalCommits": true
+      }
+    },
+    "groups": {
+      "build": {
+        "projects": ["ice-build"]
+      },
+      "hotreloader": {
+        "projects": ["ice-hotreloader"]
+      }
+    }
+  },
+  "targets": {
+    "version": {
+      "executor": "@nx/release:semantic-version",
+      "dependsOn": ["lint", "build", "test"],
+      "options": {
+        "preset": "conventional"
+      }
+    },
+    "nx-release-publish": {
+      "executor": "@nx/js:release-publish",
+      "dependsOn": ["build"],
+      "options": {
+        "packageRoot": "{projectRoot}",
+        "publishable": true
       }
     }
   }

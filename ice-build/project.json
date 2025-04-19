@@ -20,9 +20,26 @@
     },
     "version": {
       "executor": "@nx/release:semantic-version",
-      "dependsOn": ["lint", "build"],
       "options": {
-        "preset": "conventional"
+        "preset": "conventional",
+        "trackDeps": false,
+        "push": true,
+        "skipCommitTypes": ["chore", "docs"],
+        "changelogHeader": "# Changelog",
+        "releaseTagPattern": "{projectName}@{version}",
+        "git": {
+          "commit": true,
+          "tag": true,
+          "push": true
+        }
+      }
+    },
+    "nx-release-publish": {
+      "executor": "@nx/js:release-publish",
+      "dependsOn": ["build"],
+      "options": {
+        "packageRoot": "ice-build",
+        "publishable": true  // Change to true to enable publishing
       }
     }
   }

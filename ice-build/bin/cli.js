@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const buildScript = resolve(__dirname, '../build.ts');
+const buildScript = resolve(__dirname, '../dist/ice-build.js');
 
 const args = process.argv.slice(2);
 const result = spawnSync('tsx', [buildScript, ...args], { stdio: 'inherit' });
