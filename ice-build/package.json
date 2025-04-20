@@ -58,7 +58,10 @@
     }
   },
   "devDependencies": {
+    "@eslint/config-array": "^0.20.0",
+    "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.25.0",
+    "@eslint/plugin-kit": "^0.2.8",
     "@n8d/ice-hotreloader": "^0.0.1-alpha.14",
     "@nx/eslint": "20.8.0",
     "@types/eslint": "^9.6.1",
