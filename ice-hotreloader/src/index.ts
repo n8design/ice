@@ -1,2 +1,3 @@
-export { HotReloadServer } from './server';
+// Corrected import in ice-hotreloader/src/index.ts
+import { HotReloadServer } from './server.js';
 

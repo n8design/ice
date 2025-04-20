@@ -8,5 +8,5 @@ const __dirname = dirname(__filename);
 const buildScript = resolve(__dirname, '../dist/ice-build.js');
 
 const args = process.argv.slice(2);
-const result = spawnSync('tsx', [buildScript, ...args], { stdio: 'inherit' });
+const result = spawnSync('node', [buildScript, ...args], { stdio: 'inherit' });
 process.exit(result.status ?? 0);
