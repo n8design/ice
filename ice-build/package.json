@@ -1,6 +1,6 @@
 {
   "name": "@n8d/ice-build",
-  "version": "0.0.4-alpha.13",
+  "version": "0.0.4-alpha.14",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -24,7 +24,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build:tsc": "tsc --outDir dist --declaration true",
-    "build:esbuild": "esbuild ./src/ice-build.ts --bundle --outfile=dist/ice-build.js --platform=node --format=esm --external:chokidar --external:glob --external:esbuild-sass-plugin --external:@n8d/ice-hotreloader --external:jiti --external:autoprefixer --external:postcss",
+    "build:esbuild": "esbuild ./src/ice-build.ts --bundle --outfile=dist/ice-build.js --platform=node --format=esm --external:chokidar --external:glob --external:esbuild-sass-plugin --external:@n8d/ice-hotreloader --external:jiti --external:autoprefixer --external:postcss --external:browserslist",
     "build": "npm run clean && npm run build:esbuild",
     "watch": "tsx ./bin/cli.js --watch",
     "dev": "tsx ./bin/cli.js",
