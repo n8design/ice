@@ -52,29 +52,38 @@ function resolveProjectPath(relativePath: string): string {
 
 async function buildSass(filePath: string): Promise<boolean> {
     try {
-        // Use paths relative to project root consistently
+        // Normalize paths
         const sourcePath = resolveProjectPath('source');
         const publicPath = resolveProjectPath('public');
         
         const relativePath = path.relative(sourcePath, filePath);
         const outputPath = path.join(publicPath, relativePath.replace('.scss', '.css'));
+        
+        // Ensure output directory exists
+        await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
         console.log(`[${new Date().toLocaleTimeString()}] Building:
-            Input:  ${filePath}
-            Output: ${outputPath}
+            Input:  ${path.basename(filePath)}
+            Output: ${path.basename(outputPath)}
         `);
 
-        // First, build with SASS
+        // Build with esbuild + sass plugin
         await esbuild.build({
             entryPoints: [filePath],
             outfile: outputPath,
-            bundle: false,
+            bundle: true, // Enable bundling to resolve imports
             minify: true,
             sourcemap: true,
-            plugins: [sassPlugin({ loadPaths: [sourcePath] })]
+            plugins: [
+                sassPlugin({
+                    loadPaths: [sourcePath], // Include source path for imports
+                    // Remove the 'implementation' property as it's not in the type definition
+                    type: 'style',
+                })
+            ]
         });
 
-        // Then process with PostCSS
+        // Process with PostCSS (autoprefixer)
         const css = await fs.readFile(outputPath, 'utf8');
         const result = await postcss([autoprefixer]).process(css, {
             from: outputPath,
@@ -88,24 +97,23 @@ async function buildSass(filePath: string): Promise<boolean> {
             await fs.writeFile(`${outputPath}.map`, result.map.toString());
         }
 
-        const cssWebPath = path.relative('public', outputPath);
-        console.debug(cssWebPath);
-        // Notify HMR clients about CSS changes
-        hmr.notifyClients('css', cssWebPath);
-        console.log(`[${new Date().toLocaleTimeString()}] 📤 HMR: CSS update sent for ${relativePath}`);
+        // Correctly format the path for HMR notification
+        const cssPath = relativePath.replace('.scss', '.css');
+        hmr.notifyClients('css', cssPath);
+        console.log(`[${new Date().toLocaleTimeString()}] 📤 CSS update: ${cssPath}`);
+        
         return true;
     } catch (error: unknown) {
-        // Create a shorter, more readable error message
+        // Improve error handling
         if (!isVerbose) {
-            // Extract just the SASS error message without the stack trace
             const errorMessage = (error as Error).message || '';
             const sassError = errorMessage.match(/error: (.*?)(?=\n\s+at|$)/s);
             
             if (sassError && sassError[1]) {
-                console.error(`❌ SASS Error in ${path.relative(projectDir, filePath)}:`);
+                console.error(`❌ SASS Error in ${path.basename(filePath)}:`);
                 console.error(`   ${sassError[1].trim()}`);
             } else {
-                console.error(`❌ Error processing ${path.relative(projectDir, filePath)}:`);
+                console.error(`❌ Error processing ${path.basename(filePath)}:`);
                 console.error(`   ${errorMessage.split('\n')[0]}`);
             }
         } else {
@@ -279,47 +287,78 @@ async function buildTypeScript(filePath: string): Promise<void> {
     hmr.notifyClients('full', relativePath); // Reload page for JS changes
 }
 
-// Initialize SCSS watcher
-const scssWatcher = chokidar.watch(
-  path.join(projectDir, 'source', '**', '*.scss'),  
-  {
-    persistent: true,
-    ignoreInitial: false,
-    awaitWriteFinish: {
-      stabilityThreshold: 100,
-      pollInterval: 100
-    },
-    ignored: /(^|[\/\\])\../  // Ignore dotfiles
-  }
-);
+// Improved SCSS watcher implementation
 
-// Ensure all events are properly handled
+// Replace the interface definition with this:
+interface WatchersContainer {
+  scss?: ReturnType<typeof chokidar.watch>;
+  ts?: ReturnType<typeof chokidar.watch>;
+}
+
+// Use the modern approach for global augmentation
+declare global {
+  var watchers: WatchersContainer | undefined;
+}
+
+// Initialize watcher container
+global.watchers = global.watchers || {};
+
+// Close any existing watchers to prevent duplicates
+if (global.watchers?.scss) {
+  global.watchers.scss.close();
+}
+
+// Define SCSS source pattern
+const scssSourcePattern = path.join(projectDir, 'source', '**', '*.scss');
+console.log(`Watching SCSS files at: ${scssSourcePattern}`);
+
+// Create watcher with better options
+const scssWatcher = chokidar.watch(scssSourcePattern, {
+  persistent: true,
+  ignoreInitial: true,
+  awaitWriteFinish: {
+    stabilityThreshold: 300,
+    pollInterval: 100
+  },
+  ignored: [
+    /(^|[\/\\])\../,
+    '**/node_modules/**'
+  ]
+});
+
+// Store watcher globally
+global.watchers.scss = scssWatcher;
+
+// Add proper event handlers
 scssWatcher
   .on('add', async (filePath) => {
-    console.log(`[${new Date().toLocaleTimeString()}] SCSS file added: ${path.relative(projectDir, filePath)}`);
+    console.log(`[${new Date().toLocaleTimeString()}] SCSS file added: ${path.basename(filePath)}`);
     await buildSass(filePath);
-    hmr.notifyClients('css', path.relative(path.join(projectDir, 'source'), filePath).replace('.scss', '.css'));
   })
   .on('change', async (filePath) => {
-    console.log(`[${new Date().toLocaleTimeString()}] SCSS file changed: ${path.relative(projectDir, filePath)}`);
+    console.log(`[${new Date().toLocaleTimeString()}] SCSS file changed: ${path.basename(filePath)}`);
     await buildSass(filePath);
-    hmr.notifyClients('css', path.relative(path.join(projectDir, 'source'), filePath).replace('.scss', '.css'));
-  })
-  .on('unlink', (filePath) => {
-    console.log(`[${new Date().toLocaleTimeString()}] SCSS file removed: ${path.relative(projectDir, filePath)}`);
-    // Handle file deletion if needed
   })
   .on('error', (error) => {
     console.error(`SCSS watcher error: ${error}`);
   })
   .on('ready', () => {
     const watchedPaths = scssWatcher.getWatched();
-    let totalDirs = 0;
-    Object.keys(watchedPaths).forEach(dir => {
-      totalDirs += 1;
-    });
-    console.log(`SCSS watcher ready. Watching ${totalDirs} directories`);
+    const dirCount = Object.keys(watchedPaths).length;
+    console.log(`SCSS watcher ready. Watching ${dirCount} directories`);
   });
+
+// Properly shutdown watchers on exit
+process.on('SIGINT', () => {
+  console.log('Shutting down watchers...');
+  if (global.watchers?.scss) {
+    global.watchers.scss.close();
+  }
+  if (global.watchers?.ts) {
+    global.watchers.ts.close();
+  }
+  process.exit(0);
+});
 
 // Update the TypeScript watcher path
 const sourceTsGlob = resolveProjectPath('source/ts/**/*.ts');
