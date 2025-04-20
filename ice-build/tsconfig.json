@@ -1,8 +1,19 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src"
+    "target": "ES2020", // Keep target for Node.js compatibility
+    "module": "ESNext", // Correct for ES Modules
+    "moduleResolution": "bundler", // Recommended for modern TS/bundlers
+    "declaration": true, // Generate .d.ts files for the library
+    "outDir": "./dist", // Output directory for tsc (mainly for declarations)
+    "rootDir": "./src", // Specify the root directory of source files
+    "strict": true, // Enable all strict type-checking options
+    "esModuleInterop": true, // Allows default imports from CommonJS modules
+    "skipLibCheck": true, // Skip type checking of declaration files
+    "forceConsistentCasingInFileNames": true // Disallow inconsistently-cased references
+    // "sourceMap": true, // Optional: Generate source maps if needed for debugging tsc output
+    // "declarationMap": true // Optional: Generate source maps for declaration files
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"], // Include only TypeScript files within the src directory
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"] // Standard excludes + test files
 }

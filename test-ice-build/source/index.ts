@@ -9,6 +9,8 @@ function greet(name: string): string {
 const message = greet('Ice Build User');
 console.log(message);
 
+console.debug('Debugging information:');
+
 // Add content to the page
 document.addEventListener('DOMContentLoaded', () => {
   const app = document.getElementById('app');
@@ -16,3 +18,5 @@ document.addEventListener('DOMContentLoaded', () => {
     app.textContent = message;
   }
 });
+
+

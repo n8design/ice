@@ -1,4 +1,3 @@
-import autoprefixer from 'autoprefixer';
 import chokidar from 'chokidar';
 import { HotReloadServer } from '@n8d/ice-hotreloader';
 import * as esbuild from 'esbuild';
@@ -8,6 +7,7 @@ import * as fs from 'fs/promises';
 import { glob } from 'glob';
 import * as path from 'path';
 import postcss from 'postcss';
+import autoprefixer from 'autoprefixer'; // Make sure this is the correct import style for autoprefixer
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
