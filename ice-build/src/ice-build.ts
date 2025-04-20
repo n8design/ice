@@ -243,7 +243,7 @@ async function buildTypeScript(filePath: string): Promise<void> {
     });
 
     console.log(`[${new Date().toLocaleTimeString()}] 📤 HMR: TypeScript update sent for ${relativePath}`);
-    hmr.notifyClients('full'); // Reload page for JS changes
+    hmr.notifyClients('full', relativePath); // Reload page for JS changes
 }
 
 // Use absolute paths for watchers
