@@ -67,38 +67,46 @@ async function buildSass(filePath: string): Promise<boolean> {
             Output: ${path.basename(outputPath)}
         `);
 
-        // Build with esbuild + sass plugin
-        await esbuild.build({
+        // Get the SCSS output directly rather than writing to a file
+        const result = await esbuild.build({
             entryPoints: [filePath],
-            outfile: outputPath,
-            bundle: true,
+            bundle: false,  // Change to false to avoid JS wrapping
             minify: true,
             sourcemap: true,
+            write: false,   // Don't write to disk, return result instead
             plugins: [
                 sassPlugin({
                     loadPaths: [sourcePath],
-                    type: 'css', // This is crucial - we want raw CSS output, not JS
+                    type: 'css'
                 })
             ]
         });
+        
+        // Get the CSS content from result
+        let cssContent = '';
+        if (result.outputFiles && result.outputFiles.length > 0) {
+            cssContent = new TextDecoder().decode(result.outputFiles[0].contents);
+        } else {
+            throw new Error('No output received from esbuild');
+        }
 
         // Process with PostCSS (autoprefixer)
         try {
-            const css = await fs.readFile(outputPath, 'utf8');
-            const result = await postcss([autoprefixer]).process(css, {
-                from: outputPath,
+            const result = await postcss([autoprefixer]).process(cssContent, {
+                from: filePath,
                 to: outputPath,
                 map: { inline: false }
             });
 
-            // Write processed CSS back to file
+            // Write processed CSS to final output file
             await fs.writeFile(outputPath, result.css);
             if (result.map) {
                 await fs.writeFile(`${outputPath}.map`, result.map.toString());
             }
         } catch (postcssError) {
-            console.error('PostCSS processing error:', postcssError);
-            // Continue anyway since the CSS was already generated
+            // Just write the unprocessed CSS if PostCSS fails
+            await fs.writeFile(outputPath, cssContent);
+            console.error('PostCSS processing error:', isVerbose ? postcssError : (postcssError as Error).message);
         }
 
         // Correctly format the path for HMR notification
@@ -108,7 +116,7 @@ async function buildSass(filePath: string): Promise<boolean> {
         
         return true;
     } catch (error: unknown) {
-        // Error handling as before
+        // Error handling with improved messages
         if (!isVerbose) {
             const errorMessage = (error as Error).message || '';
             const sassError = errorMessage.match(/error: (.*?)(?=\n\s+at|$)/s);
