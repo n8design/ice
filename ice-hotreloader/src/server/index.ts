@@ -1,6 +1,7 @@
 import { createServer } from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
 
+// Define and export your HotReloadServer class
 export class HotReloadServer {
     private wss: WebSocketServer;
     private clients: Set<WebSocket> = new Set();
@@ -28,7 +29,8 @@ export class HotReloadServer {
         console.log(`[${new Date().toLocaleTimeString()}] 🚀 HMR Server started on ws://localhost:${port}`);
     }
     
-    notifyClients(type: 'css' | 'full', path?: string) {
+    // Methods like notifyClients, etc.
+    notifyClients(type: string, path: string) {
         const message = JSON.stringify({ type, path });
         console.log(`[${new Date().toLocaleTimeString()}] 📤 Sending message: ${message}`);
         this.clients.forEach(client => {
@@ -37,6 +39,8 @@ export class HotReloadServer {
             }
         });
     }
+    
+    // Other methods
 }// Test comment for changelog
 // Another test comment
 // Final test comment

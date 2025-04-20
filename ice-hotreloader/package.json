@@ -8,24 +8,24 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     },
     "./server": {
+      "types": "./dist/server/index.d.ts",
       "import": "./dist/server/index.js",
-      "require": "./dist/server/index.js",
-      "types": "./dist/server/index.d.ts"
+      "require": "./dist/server/index.js"
     },
     "./client": {
+      "types": "./dist/client/index.d.ts",
       "import": "./dist/client/index.js",
-      "require": "./dist/client/index.js",
-      "types": "./dist/client/index.d.ts"
+      "require": "./dist/client/index.js"
     },
     "./browser": {
+      "types": "./dist/browser.d.ts",
       "import": "./dist/browser.min.js",
-      "require": "./dist/browser.min.js",
-      "types": "./dist/browser.d.ts"
+      "require": "./dist/browser.min.js"
     }
   },
   "scripts": {
