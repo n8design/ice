@@ -71,30 +71,34 @@ async function buildSass(filePath: string): Promise<boolean> {
         await esbuild.build({
             entryPoints: [filePath],
             outfile: outputPath,
-            bundle: true, // Enable bundling to resolve imports
+            bundle: true,
             minify: true,
             sourcemap: true,
             plugins: [
                 sassPlugin({
-                    loadPaths: [sourcePath], // Include source path for imports
-                    // Remove the 'implementation' property as it's not in the type definition
-                    type: 'style',
+                    loadPaths: [sourcePath],
+                    type: 'css', // This is crucial - we want raw CSS output, not JS
                 })
             ]
         });
 
         // Process with PostCSS (autoprefixer)
-        const css = await fs.readFile(outputPath, 'utf8');
-        const result = await postcss([autoprefixer]).process(css, {
-            from: outputPath,
-            to: outputPath,
-            map: { inline: false }
-        });
+        try {
+            const css = await fs.readFile(outputPath, 'utf8');
+            const result = await postcss([autoprefixer]).process(css, {
+                from: outputPath,
+                to: outputPath,
+                map: { inline: false }
+            });
 
-        // Write processed CSS back to file
-        await fs.writeFile(outputPath, result.css);
-        if (result.map) {
-            await fs.writeFile(`${outputPath}.map`, result.map.toString());
+            // Write processed CSS back to file
+            await fs.writeFile(outputPath, result.css);
+            if (result.map) {
+                await fs.writeFile(`${outputPath}.map`, result.map.toString());
+            }
+        } catch (postcssError) {
+            console.error('PostCSS processing error:', postcssError);
+            // Continue anyway since the CSS was already generated
         }
 
         // Correctly format the path for HMR notification
@@ -104,7 +108,7 @@ async function buildSass(filePath: string): Promise<boolean> {
         
         return true;
     } catch (error: unknown) {
-        // Improve error handling
+        // Error handling as before
         if (!isVerbose) {
             const errorMessage = (error as Error).message || '';
             const sassError = errorMessage.match(/error: (.*?)(?=\n\s+at|$)/s);
