@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Ice Build</title>
+    <!-- ice-build should generate this CSS file -->
+    <link rel="stylesheet" href="/dist/styles.css">
+</head>
+<body>
+    <h1>Testing @n8d/ice-build</h1>
+    <div id="app">Loading...</div>
+
+    <!-- ice-build should generate this JS file -->
+    <script src="/dist/index.js" type="module"></script>
+
+    <!-- Add client-side script for hot-reloader if using watch mode -->
+    <!-- <script>
+      const socket = new WebSocket('ws://localhost:3001'); // Default port for ice-hotreloader
+      socket.addEventListener('message', (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'reloadPage') {
+            window.location.reload();
+          } else if (message.type === 'reloadCSS') {
+            document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+              const url = new URL(link.href);
+              url.searchParams.set('_', Date.now());
+              link.href = url.toString();
+            });
+          }
+        } catch (e) { console.error('HMR Error:', e); }
+      });
+      console.log('HMR client listening...');
+    </script> -->
+</body>
+</html>
