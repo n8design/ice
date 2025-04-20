@@ -11,9 +11,9 @@
   "devDependencies": {
     "@n8d/ice-build": "latest", 
     "@n8d/ice-hotreloader": "latest", 
-    "autoprefixer": "^10.4.14", 
-    "esbuild": "^0.21.0",
-    "postcss": "^8.4.0",
-    "sass": "^1.70.0"
+    "autoprefixer": "^10.4.21", 
+    "esbuild": "^0.25.2",
+    "postcss": "^8.5.3",
+    "sass": "^1.86.3"
   }
 }

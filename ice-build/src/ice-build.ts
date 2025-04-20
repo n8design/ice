@@ -13,6 +13,18 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Add this to your help text or argument parsing logic
+if (process.argv.includes('--help')) {
+    console.log(`
+ice-build options:
+  --project=<path>  Specify project directory
+  --verbose         Show detailed error messages
+  --no-lint         Disable ESLint
+  --help            Show this help message
+`);
+    process.exit(0);
+}
+
 // Determine the project directory based on command line argument or current working directory
 const projectArg = process.argv.find(arg => arg.startsWith('--project='));
 const projectDir = projectArg 
@@ -20,6 +32,10 @@ const projectDir = projectArg
   : process.cwd();  // Use current working directory instead of hardcoded test-core
 
 console.log(`Building project at: ${projectDir}`);
+
+// Near the top where you handle command line arguments
+const verboseArg = process.argv.includes('--verbose');
+const isVerbose = verboseArg || false;
 
 // Initialize HMR Server
 const hmr = new HotReloadServer(3001);
@@ -78,8 +94,25 @@ async function buildSass(filePath: string): Promise<boolean> {
         hmr.notifyClients('css', cssWebPath);
         console.log(`[${new Date().toLocaleTimeString()}] 📤 HMR: CSS update sent for ${relativePath}`);
         return true;
-    } catch (error) {
-        console.error('Build error:', error);
+    } catch (error: unknown) {
+        // Create a shorter, more readable error message
+        if (!isVerbose) {
+            // Extract just the SASS error message without the stack trace
+            const errorMessage = (error as Error).message || '';
+            const sassError = errorMessage.match(/error: (.*?)(?=\n\s+at|$)/s);
+            
+            if (sassError && sassError[1]) {
+                console.error(`❌ SASS Error in ${path.relative(projectDir, filePath)}:`);
+                console.error(`   ${sassError[1].trim()}`);
+            } else {
+                console.error(`❌ Error processing ${path.relative(projectDir, filePath)}:`);
+                console.error(`   ${errorMessage.split('\n')[0]}`);
+            }
+        } else {
+            // In verbose mode, show the full error
+            console.error('Build error:', error);
+        }
+        
         return false;
     }
 }
@@ -246,27 +279,47 @@ async function buildTypeScript(filePath: string): Promise<void> {
     hmr.notifyClients('full', relativePath); // Reload page for JS changes
 }
 
-// Use absolute paths for watchers
-const sourceScssGlob = resolveProjectPath('source/**/*.scss');
-console.log(`Watching SCSS files at: ${sourceScssGlob}`);
-
-const watcher = chokidar.watch(sourceScssGlob, {
-    ignored: /(^|[\/\\])\../,
+// Initialize SCSS watcher
+const scssWatcher = chokidar.watch(
+  path.join(projectDir, 'source', '**', '*.scss'),  
+  {
     persistent: true,
+    ignoreInitial: false,
     awaitWriteFinish: {
-        stabilityThreshold: 100,
-        pollInterval: 100
-    }
-});
+      stabilityThreshold: 100,
+      pollInterval: 100
+    },
+    ignored: /(^|[\/\\])\../  // Ignore dotfiles
+  }
+);
 
-watcher.on('ready', () => {
-    console.log(`SCSS watcher ready. Watching ${Object.keys(watcher.getWatched()).length} directories`);
-});
-
-watcher.on('change', async (filePath) => {
-    console.log(`[${new Date().toLocaleTimeString()}] File changed: ${filePath}`);
+// Ensure all events are properly handled
+scssWatcher
+  .on('add', async (filePath) => {
+    console.log(`[${new Date().toLocaleTimeString()}] SCSS file added: ${path.relative(projectDir, filePath)}`);
     await buildSass(filePath);
-});
+    hmr.notifyClients('css', path.relative(path.join(projectDir, 'source'), filePath).replace('.scss', '.css'));
+  })
+  .on('change', async (filePath) => {
+    console.log(`[${new Date().toLocaleTimeString()}] SCSS file changed: ${path.relative(projectDir, filePath)}`);
+    await buildSass(filePath);
+    hmr.notifyClients('css', path.relative(path.join(projectDir, 'source'), filePath).replace('.scss', '.css'));
+  })
+  .on('unlink', (filePath) => {
+    console.log(`[${new Date().toLocaleTimeString()}] SCSS file removed: ${path.relative(projectDir, filePath)}`);
+    // Handle file deletion if needed
+  })
+  .on('error', (error) => {
+    console.error(`SCSS watcher error: ${error}`);
+  })
+  .on('ready', () => {
+    const watchedPaths = scssWatcher.getWatched();
+    let totalDirs = 0;
+    Object.keys(watchedPaths).forEach(dir => {
+      totalDirs += 1;
+    });
+    console.log(`SCSS watcher ready. Watching ${totalDirs} directories`);
+  });
 
 // Update the TypeScript watcher path
 const sourceTsGlob = resolveProjectPath('source/ts/**/*.ts');
