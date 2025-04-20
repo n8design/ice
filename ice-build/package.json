@@ -1,6 +1,6 @@
 {
   "name": "@n8d/ice-build",
-  "version": "0.0.4-alpha.6",
+  "version": "0.0.4-alpha.7",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -14,7 +14,7 @@
   },
   "main": "./dist/ice-build.js",
   "bin": {
-    "ice-build": "./bin/cli.js"
+    "ice-build": "node ./bin/cli.js"
   },
   "files": [
     "bin",
