@@ -67,13 +67,13 @@ async function buildSass(filePath: string): Promise<boolean> {
             Output: ${path.basename(outputPath)}
         `);
 
-        // Get the SCSS output directly rather than writing to a file
+        // Get the SCSS output
         const result = await esbuild.build({
             entryPoints: [filePath],
-            bundle: false,  // Change to false to avoid JS wrapping
+            bundle: false,
             minify: true,
             sourcemap: true,
-            write: false,   // Don't write to disk, return result instead
+            write: false,
             plugins: [
                 sassPlugin({
                     loadPaths: [sourcePath],
@@ -82,10 +82,25 @@ async function buildSass(filePath: string): Promise<boolean> {
             ]
         });
         
-        // Get the CSS content from result
+        // Get content from result
         let cssContent = '';
         if (result.outputFiles && result.outputFiles.length > 0) {
-            cssContent = new TextDecoder().decode(result.outputFiles[0].contents);
+            const outputContent = new TextDecoder().decode(result.outputFiles[0].contents);
+            
+            // Check if the output is JS-wrapped CSS and extract the CSS part
+            if (outputContent.startsWith('(')) {
+                // Extract CSS from JavaScript template literal
+                const cssMatch = outputContent.match(/var\s+\w+=`([\s\S]*?)`/);
+                if (cssMatch && cssMatch[1]) {
+                    cssContent = cssMatch[1];
+                } else {
+                    console.warn('Could not extract CSS from JS output, using as-is');
+                    cssContent = outputContent;
+                }
+            } else {
+                // Already plain CSS
+                cssContent = outputContent;
+            }
         } else {
             throw new Error('No output received from esbuild');
         }
