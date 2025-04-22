@@ -4,12 +4,12 @@ body {
   font-family: sans-serif;
 
   h1 {
-    color: navy;
+    // color: navy;
     text-decoration: underline;
     // Example for autoprefixer
     ::placeholder {
       color: gray;
-      background-color: lime;
+      // background-color: lime;
     }
   }
 }
