@@ -1,156 +1,219 @@
 #!/usr/bin/env node
-import { fileURLToPath } from 'url';
+
 import * as path from 'path';
-import { BuildContext, BuildResult, EslintState } from './types';
-import { loadProjectConfig, detectSourceDirectory, loadTsConfig } from './config';
-import { reportError } from './utils';
-import { setupScssProcessor, setupScssWatcher } from './scss';
+import { performance } from 'perf_hooks';
+import { parseArgs } from 'node:util';
+import * as esbuild from 'esbuild';
+import { HotReloadServer } from '@n8d/ice-hotreloader';
+import { setupScssProcessor } from './scss';
 import { setupTsProcessor } from './typescript';
-import { initESLint } from './linting';
-import { createHmrServer } from './hmr';
-import { HotReloadServer } from '@n8d/ice-hotreloader'; // Add this import
+import { loadProjectConfig, loadTsConfig, detectSourceDirectory } from './config';
+import { reportError } from './utils';
+import { BuildContext, IceBuildConfig } from './types';
+import * as chokidar from 'chokidar';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+export async function startBuild(): Promise<void> {
+  const startTime = performance.now();
+  console.log('Starting ice-build...');
 
-async function parseCliArgs(): Promise<{
-  projectDir: string;
-  isVerbose: boolean;
-  watchMode: boolean;
-  skipLint: boolean;
-}> {
-  // Parse CLI options with better help message
-  if (process.argv.includes('--help')) {
-    console.log(`
-ice-build: Build tool for SCSS and TypeScript with HMR support
+  // --- Argument Parsing ---
+  const options = {
+    watch: { type: 'boolean', short: 'w', default: false },
+    'output-dir': { type: 'string', short: 'o' },
+    'source-dir': { type: 'string', short: 's' },
+    port: { type: 'string', short: 'p' },
+    verbose: { type: 'boolean', short: 'v', default: false },
+    help: { type: 'boolean', short: 'h', default: false },
+  } as const;
 
-Options:
-  --project=<path>  Specify project directory (default: current directory)
-  --verbose         Show detailed messages and errors
-  --watch           Enable watch mode for live rebuilds
-  --no-lint         Disable ESLint checking
-  --help            Show this help message
-    
-Examples:
-  ice-build --watch             Build and watch files in current directory
-  ice-build --project=./app     Build files in the ./app directory
-`);
-    process.exit(0);
+  let args;
+  try {
+    args = parseArgs({ options, allowPositionals: true });
+  } catch (e) {
+    console.error(`Error parsing arguments: ${(e as Error).message}`);
+    printHelp();
+    process.exit(1);
   }
 
-  // Parse arguments
-  const projectArg = process.argv.find(arg => arg.startsWith('--project='));
-  const projectDir = projectArg 
-    ? path.resolve(projectArg.split('=')[1])
-    : process.cwd();
-  const isVerbose = process.argv.includes('--verbose');
-  const watchMode = process.argv.includes('--watch');
-  const skipLint = process.argv.includes('--no-lint');
+  if (args.values.help) {
+    printHelp();
+    return;
+  }
 
-  return { projectDir, isVerbose, watchMode, skipLint };
-}
+  const watchMode = args.values.watch;
+  const isVerbose = args.values.verbose;
 
-async function startBuild(): Promise<BuildResult> {
-  const { projectDir, isVerbose, watchMode, skipLint } = await parseCliArgs();
-  console.log(`Building project at: ${projectDir}`);
-  
-  // Track build times
-  const buildStart = Date.now();
-  
-  // File counters
+  // --- Configuration Loading ---
+  const projectDir = process.cwd();
+  const loadedConfig: IceBuildConfig | undefined = await loadProjectConfig(projectDir);
+
+  if (!loadedConfig) {
+    console.error("Failed to load project configuration...");
+    process.exit(1);
+  }
+
+  const config: IceBuildConfig = loadedConfig; // config is guaranteed IceBuildConfig here
+
+  // Override config with CLI args
+  config.outputDir = args.values['output-dir'] || config.outputDir;
+  config.sourceDir = args.values['source-dir'] || config.sourceDir;
+  config.port = args.values.port ? parseInt(args.values.port, 10) : config.port;
+
+  // Detect source directory *before* final config adjustments if needed
+  // Pass the whole config object
+  const detectedSourceDir = await detectSourceDirectory(projectDir, config);
+  config.sourceDir = detectedSourceDir; // Assign the detected path back
+
+  const outputDir = config.outputDir || 'public';
+  const port = config.port || 3001;
+
+  // Load tsConfig *after* all config values are finalized
+  const tsConfig = await loadTsConfig(projectDir, config); // Pass the final config object
+
+  // Ensure sourceDir is defined before creating context (detectSourceDirectory should handle this)
+  if (!config.sourceDir) {
+    console.error("❌ Error: Source directory could not be determined.");
+    process.exit(1);
+  }
+
+  const ctx: BuildContext = {
+    projectDir,
+    sourceDir: config.sourceDir, // Use the validated sourceDir
+    outputDir,
+    config,
+    tsConfig,
+    watchMode,
+    isVerbose,
+  };
+
+  console.log(`Source directory: ${ctx.sourceDir}`);
+  console.log(`Output directory: ${outputDir}`);
+  if (watchMode) console.log(`Watch mode enabled. HMR port: ${port}`);
+
+  // --- Hot Reload Server ---
+  let hmr: HotReloadServer | null = null;
+  if (watchMode) {
+    try {
+      hmr = new HotReloadServer(port);
+    } catch (error) {
+      reportError('HMR Server failed to start', error as Error, isVerbose);
+      process.exit(1);
+    }
+  }
+
+  // --- Build Setup ---
+  let scssContext: esbuild.BuildContext | null = null;
+  let tsContext: esbuild.BuildContext | null = null;
   const scssFilesCount = { value: 0 };
   const tsFilesCount = { value: 0 };
-  
+
   try {
-    // Load configuration
-    const config = await loadProjectConfig(projectDir);
-    
-    // Detect source directory
-    const sourceDir = await detectSourceDirectory(projectDir, config);
-    const outputDir = config.outputDir || 'public';
-    
-    // Initialize HMR Server
-    const hmrPort = config.port || 3001;
-    const hmr = createHmrServer(hmrPort);
-    
-    // Create build context
-    const ctx: BuildContext = {
-      projectDir,
-      sourceDir,
-      outputDir,
-      isVerbose,
-      watchMode,
-      skipLint,
-      config
-    };
-    
-    // Initialize ESLint if needed
-    const eslintState = !skipLint ? await initESLint(projectDir) : { instance: null, isFlatConfig: false, flatConfigModule: null };
-    
-    // Create SCSS processor
-    const scssContext = await setupScssProcessor(ctx, hmr, scssFilesCount);
-    
-    // Setup SCSS watcher if in watch mode
-    const scssWatcher = await setupScssWatcher(ctx, scssContext);
-    
-    // Load TypeScript config
-    const tsConfig = await loadTsConfig(projectDir, config);
-    
-    // Create TypeScript processor - explicitly cast to Record<string, unknown>
-    const tsContext = await setupTsProcessor(
-      ctx, 
-      hmr, 
-      tsConfig as Record<string, unknown>, 
-      eslintState.instance, 
-      tsFilesCount
-    );
-    
-    // Run initial builds
-    await scssContext.rebuild();
-    await tsContext.rebuild();
-    
-    // Report build performance
-    const buildTime = Date.now() - buildStart;
-    console.log(`Built ${scssFilesCount.value} SCSS and ${tsFilesCount.value} TypeScript files in ${buildTime}ms`);
-    
-    // Start watching if in watch mode
+    // Use non-null assertion carefully, assuming hmr is needed by processors in watch mode
+    scssContext = await setupScssProcessor(ctx, hmr!, scssFilesCount);
+    tsContext = await setupTsProcessor(ctx, hmr!, tsFilesCount);
+
+    // --- Build Execution ---
     if (watchMode) {
-      console.log('Starting watch mode...');
+      // Initial build and start esbuild's watch mode (this handles changes to existing files)
+      console.log('Initial build starting...');
       await Promise.all([
-        scssContext.watch(),
-        tsContext.watch()
+        scssContext.rebuild(),
+        tsContext.rebuild()
       ]);
-      console.log(`[${new Date().toLocaleTimeString()}] ✅ Build completed. Watching for changes...`);
+      console.log('Initial build complete. Watching for changes...');
+      
+      // Start esbuild watching (for changes to EXISTING files)
+      scssContext.watch();
+      tsContext.watch();
+      
+      // Add directory watcher to detect NEW files
+      const watcher = chokidar.watch(
+        path.join(ctx.projectDir, ctx.sourceDir), 
+        {
+          ignoreInitial: true,
+          awaitWriteFinish: true
+        }
+      );
+      
+      // When new files are added that match our patterns
+      watcher.on('add', async (filePath) => {
+        const relativePath = path.relative(ctx.projectDir, filePath);
+        
+        if (filePath.endsWith('.scss')) {
+          // Only rebuild for non-partial SCSS files (don't start with _)
+          if (!path.basename(filePath).startsWith('_')) {
+            console.log('Rebuilding SCSS context with new entry points...');
+            // Dispose old context and create a new one
+            await scssContext?.dispose();
+            scssContext = await setupScssProcessor(ctx, hmr!, scssFilesCount);
+            await scssContext.rebuild();
+            // CRITICAL ADDITION: Restart watch mode on the new context
+            scssContext.watch();
+          }
+        } else if (filePath.endsWith('.ts')) {
+          console.log('Rebuilding TypeScript context with new entry points...');
+          // Dispose old context and create a new one
+          await tsContext?.dispose();
+          tsContext = await setupTsProcessor(ctx, hmr!, tsFilesCount);
+          await tsContext.rebuild();
+          // CRITICAL ADDITION: Restart watch mode on the new context
+          tsContext.watch();
+        }
+      });
+      
+      console.log('Watching for file changes and new files... (Press Ctrl+C to stop)');
+      await new Promise(() => {});
     } else {
-      // Clean up contexts
+      // Single build run
+      await Promise.all([
+        scssContext.rebuild(),
+        tsContext.rebuild()
+      ]);
       await scssContext.dispose();
       await tsContext.dispose();
-      console.log(`[${new Date().toLocaleTimeString()}] ✅ Build completed.`);
     }
-    
-    // Handle graceful shutdown
-    process.on('SIGINT', async () => {
-      console.log('Shutting down...');
-      if (scssWatcher) scssWatcher.close();
-      await scssContext.dispose();
-      await tsContext.dispose();
-      process.exit(0);
-    });
-    
-    return { 
-      scssFiles: scssFilesCount.value, 
-      tsFiles: tsFilesCount.value, 
-      buildTime 
-    };
+
   } catch (error) {
-    reportError('Build setup', error as Error, isVerbose);
-    throw error;
+    reportError('Build setup or run failed', error as Error, isVerbose);
+    if (scssContext) await scssContext.dispose();
+    if (tsContext) await tsContext.dispose();
+    process.exit(1);
+  }
+
+  // --- Watch Mode Handling & Shutdown ---
+  if (watchMode) {
+    const shutdown = async () => {
+      console.log('\nShutting down...');
+      // Dispose contexts on shutdown
+      await Promise.allSettled([
+        scssContext?.dispose(),
+        tsContext?.dispose(),
+      ]);
+      console.log('Build contexts disposed. HMR server stopped.');
+      process.exit(0);
+    };
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+    // The await new Promise above keeps it alive until SIGINT/SIGTERM
+  } else {
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    console.log(`✅ Build finished in ${duration.toFixed(2)}ms`);
+    console.log(`   Processed ${scssFilesCount.value} SCSS files.`);
+    console.log(`   Processed ${tsFilesCount.value} TypeScript files.`);
   }
 }
 
-// Start the build process
-startBuild().catch(error => {
-  const err = error as Error;
-  console.error('Build process failed:', err.message);
-  process.exit(1);
-});
+function printHelp() {
+  console.log(`
+Usage: ice-build [options]
+
+Options:
+  -w, --watch         Enable watch mode with Hot Module Reloading (HMR).
+  -o, --output-dir    Specify the output directory (default: public).
+  -s, --source-dir    Specify the source directory (default: detected source/src).
+  -p, --port          Specify the HMR server port (default: 3001).
+  -v, --verbose       Enable verbose logging.
+  -h, --help          Display this help message.
+`);
+}

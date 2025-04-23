@@ -1,2 +1,1 @@
-export * from './partial-detection';
-export * from './processor';
+export { setupScssProcessor } from './processor';

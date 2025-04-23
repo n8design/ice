@@ -8,12 +8,14 @@
     "build": "ice-build",
     "watch": "ice-build --watch"
   },
+  "dependencies": {
+    "@n8d/ice-build": "file:../ice-build",
+    "@n8d/ice-hotreloader": "file:../ice-hotreloader"
+  },
   "devDependencies": {
-    "@n8d/ice-build": "latest", 
-    "@n8d/ice-hotreloader": "latest", 
-    "autoprefixer": "^10.4.21", 
-    "esbuild": "^0.25.2",
+    "autoprefixer": "^10.4.21",
+    "esbuild": "^0.25.3",
     "postcss": "^8.5.3",
-    "sass": "^1.86.3"
+    "sass": "^1.87.0"
   }
 }

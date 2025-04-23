@@ -1,40 +1,24 @@
-import { ESLint } from 'eslint';
-import { Plugin } from 'esbuild';
 import { AcceptedPlugin } from 'postcss';
-
-export interface SassOptions {
-  includePaths?: string[];
-  [key: string]: unknown;
-}
+// Correct import for SassPluginOptions
+import { SassPluginOptions } from 'esbuild-sass-plugin';
+import { TsconfigRaw } from 'esbuild';
 
 export interface IceBuildConfig {
   sourceDir?: string;
   outputDir?: string;
-  sassOptions?: SassOptions;
+  sassOptions?: SassPluginOptions; // Use correct imported type
   postcssPlugins?: AcceptedPlugin[];
   typescriptOptions?: Record<string, unknown>;
   port?: number;
-  imagePath?: string; // Add this for configurable image paths
+  imagePath?: string;
 }
 
 export interface BuildContext {
   projectDir: string;
   sourceDir: string;
   outputDir: string;
-  isVerbose: boolean;
-  watchMode: boolean;
-  skipLint: boolean;
   config: IceBuildConfig;
-}
-
-export interface EslintState {
-  instance: ESLint | null;
-  isFlatConfig: boolean;
-  flatConfigModule: unknown;
-}
-
-export interface BuildResult {
-  scssFiles: number;
-  tsFiles: number;
-  buildTime: number;
+  tsConfig: TsconfigRaw | null;
+  watchMode: boolean;
+  isVerbose: boolean;
 }
