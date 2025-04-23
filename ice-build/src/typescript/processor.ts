@@ -3,8 +3,8 @@ import * as P from 'path';
 import { glob } from 'glob';
 import { HotReloadServer } from '@n8d/ice-hotreloader';
 import { BuildContext } from '../types';
-// Temporarily comment out the import to test the build without it
-// import { resolvePathAliases } from './path-alias-plugin';
+// UNCOMMENT THIS LINE to re-enable path aliases
+import { resolvePathAliases } from './path-alias-plugin';
 import { reportError } from '../utils';
 import * as fs from 'fs';
 
@@ -13,7 +13,8 @@ export async function setupTsProcessor(
   hmr: HotReloadServer,
   tsFilesCount: { value: number }
 ): Promise<esbuild.BuildContext> {
-  const globPattern = `${ctx.sourceDir}/**/*.ts`;
+  // Update the glob pattern to include both .ts and .tsx files
+  const globPattern = `${ctx.sourceDir}/**/*.{ts,tsx}`;
   // Filter to ensure we only process files, not directories
   const entryPoints = (await glob(globPattern, { cwd: ctx.projectDir }))
     .filter(file => {
@@ -35,28 +36,23 @@ export async function setupTsProcessor(
 
   const plugins: esbuild.Plugin[] = [];
 
-  // --- Path Alias Plugin Handling (Temporarily Disabled) ---
-  console.warn("Path alias plugin temporarily disabled for testing."); // Add a warning
-  /*
-  try {
-    // This assumes the import worked if we reach here without crashing
-    if (typeof resolvePathAliases === 'function') {
-       if (ctx.tsConfig?.compilerOptions?.paths) {
-         plugins.push(resolvePathAliases(ctx.tsConfig, ctx.projectDir));
-         if (ctx.isVerbose) console.log("Path alias plugin enabled.");
-       } else {
-         if (ctx.isVerbose) console.log("Path alias plugin: No paths found in tsconfig.json.");
-       }
-    } else {
-        console.warn("Path alias plugin: 'resolvePathAliases' function not found after import.");
+  // RE-ENABLE this section - Path Alias Plugin Handling
+  // Remove the warning and uncomment the try/catch block
+  if (ctx.tsConfig?.compilerOptions?.paths) {
+    try {
+      const pathAliasPlugin = resolvePathAliases(
+        ctx.projectDir,
+        ctx.sourceDir,
+        ctx.tsConfig.compilerOptions.paths
+      );
+      plugins.push(pathAliasPlugin);
+      if (ctx.isVerbose) {
+        console.log("[TS] Path alias plugin enabled");
+      }
+    } catch (error) {
+      reportError('Path alias plugin', error as Error, ctx.isVerbose);
     }
-  } catch (e) {
-      console.error(`\n---`);
-      console.error(`⚠️ Error: Could not load the path alias plugin ('./path-alias-plugin').`);
-      // ... rest of error message ...
-      console.error(`---\n`);
   }
-  */
 
   // --- HMR Notify Plugin ---
   plugins.push({
