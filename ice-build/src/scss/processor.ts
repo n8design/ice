@@ -26,7 +26,6 @@ export async function setupScssProcessor(
     console.log(`[SCSS] Found ${entryPoints.length} entry points`);
   }
 
-  // Create a drastically simplified plugin configuration
   return esbuild.context({
     entryPoints: entryPoints,
     outdir: P.join(ctx.projectDir, ctx.outputDir),
@@ -37,50 +36,39 @@ export async function setupScssProcessor(
     write: true,
     metafile: true,
     plugins: [
-      // Enhanced importer configuration
+      // Add a custom URL resolver plugin BEFORE sass processing
+      {
+        name: 'ignore-image-urls',
+        setup(build) {
+          // This runs before sass processing to handle URL patterns
+          build.onResolve({ filter: /\.(png|jpg|jpeg|gif|svg|webp)($|\?)/ }, (args) => {
+            if (ctx.isVerbose) {
+              console.log(`[URL Resolver] Ignoring image reference: ${args.path}`);
+            }
+            // Return a path that will be ignored
+            return { path: args.path, external: true };
+          });
+          
+          // Also catch /images/ paths specifically
+          build.onResolve({ filter: /^\/images\// }, (args) => {
+            if (ctx.isVerbose) {
+              console.log(`[URL Resolver] Ignoring image path: ${args.path}`);
+            }
+            return { path: args.path, external: true };
+          });
+        }
+      },
+      
+      // Then the sass plugin with minimal options
       sassPlugin({
         type: 'css',
-        importers: [{
-          // Enhanced importer that skips all image URLs
-          canonicalize: (url) => {
-            // Debug logging if verbose mode is on
-            if (ctx.isVerbose) {
-              console.log(`[SCSS] Processing URL import: ${url}`);
-            }
-            
-            // More comprehensive detection of image paths
-            if (
-              url.startsWith('http') || 
-              url.startsWith('/images/') || // Absolute paths from root
-              url.includes('/images/') ||   // Paths containing /images/ anywhere
-              url.match(/\.(png|jpg|jpeg|gif|svg|webp)($|\?)/) // Any image file extension
-            ) {
-              if (ctx.isVerbose) {
-                console.log(`[SCSS] Skipping image URL: ${url}`);
-              }
-              return null; // Skip this import
-            }
-            
-            // For all other imports, proceed normally
-            try {
-              return new URL(url);
-            } catch (error) {
-              console.warn(`[SCSS] Warning: Invalid URL "${url}" - ${(error as Error).message}`);
-              return null; // Skip invalid URLs
-            }
-          },
-          load: (canonicalUrl) => {
-            // Standard loading for non-skipped imports
-            return { contents: '', syntax: 'scss' };
-          }
-        }],
-        // Keep other options
         loadPaths: [P.join(ctx.projectDir, ctx.sourceDir)],
         ...ctx.config.sassOptions,
         sourceMap: true,
         sourceMapIncludeSources: true
       }),
-      // Simplified HMR notify plugin
+      
+      // HMR notify plugin remains the same
       {
         name: 'scss-hmr-notify',
         setup(build) {
