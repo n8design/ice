@@ -37,10 +37,48 @@ export async function setupScssProcessor(
     write: true,
     metafile: true,
     plugins: [
-      // Absolute minimal configuration
+      // Enhanced importer configuration
       sassPlugin({
-        type: 'css'
-        // No other options for now
+        type: 'css',
+        importers: [{
+          // Enhanced importer that skips all image URLs
+          canonicalize: (url) => {
+            // Debug logging if verbose mode is on
+            if (ctx.isVerbose) {
+              console.log(`[SCSS] Processing URL import: ${url}`);
+            }
+            
+            // More comprehensive detection of image paths
+            if (
+              url.startsWith('http') || 
+              url.startsWith('/images/') || // Absolute paths from root
+              url.includes('/images/') ||   // Paths containing /images/ anywhere
+              url.match(/\.(png|jpg|jpeg|gif|svg|webp)($|\?)/) // Any image file extension
+            ) {
+              if (ctx.isVerbose) {
+                console.log(`[SCSS] Skipping image URL: ${url}`);
+              }
+              return null; // Skip this import
+            }
+            
+            // For all other imports, proceed normally
+            try {
+              return new URL(url);
+            } catch (error) {
+              console.warn(`[SCSS] Warning: Invalid URL "${url}" - ${(error as Error).message}`);
+              return null; // Skip invalid URLs
+            }
+          },
+          load: (canonicalUrl) => {
+            // Standard loading for non-skipped imports
+            return { contents: '', syntax: 'scss' };
+          }
+        }],
+        // Keep other options
+        loadPaths: [P.join(ctx.projectDir, ctx.sourceDir)],
+        ...ctx.config.sassOptions,
+        sourceMap: true,
+        sourceMapIncludeSources: true
       }),
       // Simplified HMR notify plugin
       {
