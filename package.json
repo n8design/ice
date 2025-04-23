@@ -26,11 +26,11 @@
   "scripts": {
     "// Build scripts": "",
     "build": "nx run-many --target=build --all",
-    "build:ice": "nx run --project=ice-build build",
-    "build:hotreloader": "nx run --project=ice-hotreloader build",
+    "build:ice": "nx run --projects=ice-build build",
+    "build:hotreloader": "nx run --projects=ice-hotreloader build",
     "watch": "npm-run-all --parallel watch:*",
-    "watch:ice": "nx run --project=ice-build watch",
-    "watch:hotreloader": "nx run --project=ice-hotreloader watch",
+    "watch:ice": "nx run --projects=ice-build watch",
+    "watch:hotreloader": "nx run --projects=ice-hotreloader watch",
 
     "// Lint and test scripts": "",
     "lint": "nx run-many --target=lint --all",
@@ -43,18 +43,18 @@
     "changelog:regenerate:ice-hotreloader": "cd ice-hotreloader && conventional-changelog -p angular -i CHANGELOG.md -s -r 0",
 
     "// Standard releases (individually)": "",
-    "release:ice-build": "nx release version --project=ice-build",
-    "release:ice-hotreloader": "nx release version --project=ice-hotreloader",
+    "release:ice-build": "nx release version --projects=ice-build",
+    "release:ice-hotreloader": "nx release version --projects=ice-hotreloader",
     "release:all": "nx release version --projects=ice-build,ice-hotreloader && npm run changelog:ice-build && npm run changelog:ice-hotreloader && git add */package.json */CHANGELOG.md package-lock.json && git commit -m \"chore(release): versions [skip ci]\" && git tag ice@v$(date +%Y%m%d%H%M) && git push --follow-tags",
 
     "// Alpha releases (individually)": "",
-    "release:alpha:ice-build": "nx release version --project=ice-build --specifier=prerelease --preid=alpha && npm run changelog:ice-build && git add ice-build/package.json ice-build/CHANGELOG.md package-lock.json && git commit -m \"chore(release): ice-build@$(node -p \\\"require('./ice-build/package.json').version\\\") [skip ci]\" && git tag ice-build@$(node -p \"require('./ice-build/package.json').version\") && git push --follow-tags",
-    "release:alpha:ice-hotreloader": "nx release version --project=ice-hotreloader --specifier=prerelease --preid=alpha && npm run changelog:ice-hotreloader && git add ice-hotreloader/package.json ice-hotreloader/CHANGELOG.md package-lock.json && git commit -m \"chore(release): ice-hotreloader@$(node -p \\\"require('./ice-hotreloader/package.json').version\\\") [skip ci]\" && git tag ice-hotreloader@$(node -p \"require('./ice-hotreloader/package.json').version\") && git push --follow-tags",
+    "release:alpha:ice-build": "nx release version --projects=ice-build --specifier=prerelease --preid=alpha && npm run changelog:ice-build && git add ice-build/package.json ice-build/CHANGELOG.md package-lock.json && git commit -m \"chore(release): ice-build@$(node -p \\\"require('./ice-build/package.json').version\\\") [skip ci]\" && git tag ice-build@$(node -p \"require('./ice-build/package.json').version\") && git push --follow-tags",
+    "release:alpha:ice-hotreloader": "nx release version --projects=ice-hotreloader --specifier=prerelease --preid=alpha && npm run changelog:ice-hotreloader && git add ice-hotreloader/package.json ice-hotreloader/CHANGELOG.md package-lock.json && git commit -m \"chore(release): ice-hotreloader@$(node -p \\\"require('./ice-hotreloader/package.json').version\\\") [skip ci]\" && git tag ice-hotreloader@$(node -p \"require('./ice-hotreloader/package.json').version\") && git push --follow-tags",
     "release:alpha:all": "nx release version --projects=ice-build,ice-hotreloader --specifier=prerelease --preid=alpha && npm run changelog:ice-build && npm run changelog:ice-hotreloader && git add */package.json */CHANGELOG.md package-lock.json && git commit -m \"chore(release): alpha versions [skip ci]\" && git tag ice@alpha-$(date +%Y%m%d%H%M) && git push --follow-tags",
 
     "// Standard publish (individually)": "",
-    "publish:ice-build": "nx release publish --project=ice-build",
-    "publish:ice-hotreloader": "nx release publish --project=ice-hotreloader",
+    "publish:ice-build": "nx release publish --projects=ice-build",
+    "publish:ice-hotreloader": "nx release publish --projects=ice-hotreloader",
     "publish:all": "nx release publish --projects=ice-build,ice-hotreloader",
     
     "// Combined release+publish": "",
@@ -68,8 +68,8 @@
     "release-publish:alpha:all": "npm run release:alpha:all && npm run publish:all",
 
     "// Stable version releases (with version param)": "",
-    "release:stable:ice-build": "nx release version --project=ice-build --specifier=$1 && npm run changelog:ice-build && git add ice-build/package.json ice-build/CHANGELOG.md package-lock.json && git commit -m \"chore(release): ice-build@$(node -p \\\"require('./ice-build/package.json').version\\\") [skip ci]\" && git tag ice-build@$(node -p \"require('./ice-build/package.json').version\") && git push --follow-tags",
-    "release:stable:ice-hotreloader": "nx release version --project=ice-hotreloader --specifier=$1 && npm run changelog:ice-hotreloader && git add ice-hotreloader/package.json ice-hotreloader/CHANGELOG.md package-lock.json && git commit -m \"chore(release): ice-hotreloader@$(node -p \\\"require('./ice-hotreloader/package.json').version\\\") [skip ci]\" && git tag ice-hotreloader@$(node -p \"require('./ice-hotreloader/package.json').version\") && git push --follow-tags",
+    "release:stable:ice-build": "nx release version --projects=ice-build --specifier=$1 && npm run changelog:ice-build && git add ice-build/package.json ice-build/CHANGELOG.md package-lock.json && git commit -m \"chore(release): ice-build@$(node -p \\\"require('./ice-build/package.json').version\\\") [skip ci]\" && git tag ice-build@$(node -p \"require('./ice-build/package.json').version\") && git push --follow-tags",
+    "release:stable:ice-hotreloader": "nx release version --projects=ice-hotreloader --specifier=$1 && npm run changelog:ice-hotreloader && git add ice-hotreloader/package.json ice-hotreloader/CHANGELOG.md package-lock.json && git commit -m \"chore(release): ice-hotreloader@$(node -p \\\"require('./ice-hotreloader/package.json').version\\\") [skip ci]\" && git tag ice-hotreloader@$(node -p \"require('./ice-hotreloader/package.json').version\") && git push --follow-tags",
     "release:stable:all": "nx release version --projects=ice-build,ice-hotreloader --specifier=$1 && npm run changelog:ice-build && npm run changelog:ice-hotreloader && git add */package.json */CHANGELOG.md package-lock.json && git commit -m \"chore(release): stable version $1 [skip ci]\" && git tag ice@$1 && git push --follow-tags"
   },
   "dependencies": {
