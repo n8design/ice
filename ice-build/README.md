@@ -6,14 +6,20 @@
 
 ## Features
 
-- **Sass/SCSS Compilation:** Compiles `.scss` files to `.css`.
+- **Sass/SCSS Compilation:** Compiles `.scss` files to `.css` with intelligent partial detection.
 - **PostCSS Integration:** Applies PostCSS plugins, including Autoprefixer by default.
-- **TypeScript Processing:** Compiles TypeScript files with full support for modern TS features.
+- **TypeScript Processing:** Compiles TypeScript files with full support for project-specific `tsconfig.json`.
 - **ESLint Integration:** Lints code during the build process with support for both flat and legacy ESLint configs.
-- **Reliable File Watching:** Multi-layered file monitoring system that works across various file systems.
-- **Debounced Builds:** Prevents duplicate processing when multiple file changes are detected.
+- **Smart Partial Handling:** When SCSS partials change, only recompiles files that import them.
+- **Optimized Output Structure:** TypeScript files in `source/ts/` are automatically placed in `public/js/`.
+- **Reliable File Watching:** Multi-layered file monitoring system that works across various file systems, including mounted volumes.
+- **Selective Rebuilds:** Only processes affected files when changes are detected.
 - **Hot Module Reloading:** Integrates with `@n8d/ice-hotreloader` for live updates without full page refreshes.
 - **Zero Configuration:** Works out-of-the-box with conventional project structures.
+- **Advanced Import Detection:** Accurately detects which files import SCSS partials by parsing content.
+- **Path Alias Support:** Resolves TypeScript path aliases defined in tsconfig.json.
+- **Performance Caching:** Skips writing unchanged files for faster builds.
+- **Custom Configuration:** Optional config file for advanced customization.
 
 ## Installation
 
@@ -78,22 +84,60 @@ npm run dev
 
 ## Project Structure
 
-By default, `ice-build` expects the following structure:
+By default, `ice-build` works with the following directory structures:
 
 ```
 your-project/
-├── public/             # Static assets and output directory
-│   ├── css/            # CSS output
-│   ├── js/             # JavaScript/TypeScript output
-│   └── index.html      # Your main HTML file
-├── source/             # Source files
-│   ├── css/            # SCSS/SASS files
-│   │   └── style.scss  # Main stylesheet
-│   ├── ts/             # TypeScript files
-│   │   └── index.ts    # Main entry point
-│   └── index.html      # Template HTML
+├── public/               # Output directory (configurable)
+│   ├── css/              # CSS output
+│   ├── js/               # JavaScript/TypeScript output 
+├── source/ OR src/       # Source files (either name works)
+│   ├── css/              # SCSS/SASS files
+│   ├── styles/           # Alternative location for styles
+│   ├── ts/               # TypeScript files (outputs directly to js/)
+│   └── ...
+├── ice-build.config.js   # Optional configuration file
+├── tsconfig.json         # TypeScript configuration (optional)
 └── package.json
 ```
+
+The tool automatically detects whether your project uses a `source/` or `src/` directory and adapts accordingly.
+
+## Custom Configuration
+
+Create an `ice-build.config.js` file in your project root for advanced configuration:
+
+```javascript
+export default {
+  // Source directory (default: auto-detected 'source' or 'src')
+  sourceDir: 'source',
+  
+  // Output directory (default: 'public')
+  outputDir: 'public',
+  
+  // HMR server port (default: 3001)
+  port: 3001,
+  
+  // Sass options passed to esbuild-sass-plugin
+  sassOptions: {
+    includePaths: ['node_modules']
+  },
+  
+  // PostCSS plugins (default: [autoprefixer])
+  postcssPlugins: [
+    require('autoprefixer'),
+    require('cssnano')({ preset: 'default' })
+  ],
+  
+  // Override TypeScript options (merges with tsconfig.json if present)
+  typescriptOptions: {
+    target: "es2020",
+    module: "es2020"
+  }
+}
+```
+
+You can also use `.json` or `.mjs` file formats.
 
 ## TypeScript Configuration
 
@@ -128,43 +172,82 @@ Create a `tsconfig.json` file in your project root:
 }
 ```
 
+ice-build will automatically detect and use your project's `tsconfig.json` settings, including:
+
+- `target`: Determines the ECMAScript target version
+- `module`: Sets the module format (ESM, CommonJS)
+- `sourceMap`: Controls source map generation
+- `paths`: Supports TypeScript path aliases
+- Other relevant compiler options
+
+If no `tsconfig.json` is found, sensible defaults are used.
+
 ## Command Line Options
 
 * `--watch`: Enables watch mode with automatic rebuilds on file changes.
 * `--verbose`: Shows detailed output during building and file watching.
 * `--project <path>`: Specifies the root directory of the project to build (defaults to current working directory).
-* `--lint`: Enables ESLint during the build process.
-* `--sourcemap`: Generates sourcemaps for JS and CSS files.
-* `--production`: Creates a production build with minification.
+* `--no-lint`: Disables ESLint during the build process.
+* `--help`: Shows help information and available commands.
 
 ## Advanced Features
 
-### Reliable File Watching
+### Enhanced SCSS Partial Handling
 
-ice-build implements a multi-layered file watching system that works reliably across:
-- Local drives
-- Network drives
-- External volumes
-- Virtual file systems
+ice-build now intelligently detects SCSS imports by parsing file content:
 
-The system combines:
-- Directory-based monitoring with chokidar
-- File-specific watchers for critical files
-- Native Node.js fs.watch as fallback
+- **Smart Parsing**: Detects @import, @use, and @forward statements with accurate path resolution
+- **Selective Rebuilds**: When a partial changes, only rebuilds files that actually import it
+- **Multiple Import Syntaxes**: Supports various import methods and path styles
 
-### ESLint Integration
+### Path Alias Resolution
 
-ice-build automatically detects:
-- Modern flat ESLint config (eslint.config.js)
-- Legacy ESLint config (.eslintrc.js, .eslintrc.json, etc.)
+Automatically resolves TypeScript path aliases from tsconfig.json:
 
-Linting is performed automatically for TypeScript files and warnings/errors are reported in the console.
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["source/*"],
+      "@components/*": ["source/components/*"]
+    }
+  }
+}
+```
+
+This allows you to use imports like:
+
+```typescript
+import { Button } from '@components/button';
+```
+
+### File Caching
+
+Files are only rewritten when their content changes, improving build speed.
+
+### Custom PostCSS Plugins
+
+Add your own PostCSS plugins via configuration:
+
+```javascript
+export default {
+  postcssPlugins: [
+    require('autoprefixer'),
+    require('cssnano')({ preset: 'default' }),
+    require('postcss-preset-env')()
+  ]
+}
+```
+
+### TypeScript File Flattening
+
+Files in `source/ts/` directory (including subdirectories) are automatically placed directly in the root of `public/js/`, creating a simplified output structure.
 
 ### Hot Module Reloading
 
 When running in `--watch` mode:
 
-1. ice-build automatically starts a WebSocket server on port 3001
+1. ice-build automatically starts a WebSocket server on port 3001 (configurable)
 2. When CSS changes, only stylesheets are refreshed (no page reload)
 3. When TS/JS changes, the page receives a reload notification
 4. Add this script tag to your HTML to enable HMR:
@@ -180,4 +263,4 @@ If files aren't being watched correctly:
 1. Use `--verbose` flag to see detailed file watching information
 2. Check that your directory structure matches the expected structure
 3. Try running with `--project=path/to/project` to explicitly set the project root
-4. If on network drives, ensure the polling interval is set appropriately
+4. For mounted volumes or network drives, the system should automatically adapt its watching strategy

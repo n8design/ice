@@ -5,4 +5,6 @@ import { BrowserHMR } from './browser/index.js';
 const hmr = new BrowserHMR();
 
 // Expose to global scope if needed
-(window as any).IceHMR = hmr;
+(window as unknown as { IceHMR: BrowserHMR }).IceHMR = hmr;
+
+// No unused variables or types - just the core functionality
