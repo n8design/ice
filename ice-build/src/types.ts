@@ -14,6 +14,7 @@ export interface IceBuildConfig {
   postcssPlugins?: AcceptedPlugin[];
   typescriptOptions?: Record<string, unknown>;
   port?: number;
+  imagePath?: string; // Add this for configurable image paths
 }
 
 export interface BuildContext {

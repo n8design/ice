@@ -37,7 +37,6 @@ export async function loadProjectConfig(projectDir: string): Promise<IceBuildCon
   return DEFAULT_CONFIG;
 }
 
-// Change the return type from 'unknown' to 'Record<string, unknown>'
 export async function loadTsConfig(projectDir: string, config: IceBuildConfig): Promise<Record<string, unknown>> {
   // Use config from ice-build config if provided
   if (config.typescriptOptions) {
@@ -58,23 +57,30 @@ export async function loadTsConfig(projectDir: string, config: IceBuildConfig): 
     await fs.access(tsconfigPath);
     console.log(`Found TypeScript config at: ${tsconfigPath}`);
     
-    // Read and parse tsconfig.json
-    const tsconfigContent = await fs.readFile(tsconfigPath, 'utf-8');
-    const tsconfig = JSON.parse(tsconfigContent) as Record<string, unknown>;
-    
-    console.log('Using project TypeScript configuration');
-    return tsconfig;
+    try {
+      // Read and parse tsconfig.json
+      const tsconfigContent = await fs.readFile(tsconfigPath, 'utf-8');
+      
+      // Try to remove comments from JSON before parsing
+      const jsonContent = tsconfigContent.replace(/\/\/.*$/gm, '');
+      const tsconfig = JSON.parse(jsonContent) as Record<string, unknown>;
+      
+      console.log('Using project TypeScript configuration');
+      return tsconfig;
+    } catch (parseError) {
+      console.error(`Error parsing tsconfig.json: ${(parseError as Error).message}`);
+      console.log('Falling back to default TypeScript settings');
+      return DEFAULT_TS_CONFIG;
+    }
   } catch (error) {
-    const err = error as Error;
-    
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       console.log('No tsconfig.json found, using default TypeScript settings');
     } else {
-      reportError('TypeScript config parsing', err);
+      reportError('TypeScript config access', error as Error);
       console.log('Falling back to default TypeScript settings');
     }
     
-    return DEFAULT_TS_CONFIG as Record<string, unknown>;
+    return DEFAULT_TS_CONFIG;
   }
 }
 

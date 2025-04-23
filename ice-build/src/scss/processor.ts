@@ -48,7 +48,37 @@ export async function setupScssProcessor(
         loadPaths: [path.join(ctx.projectDir, ctx.sourceDir)],
         ...ctx.config.sassOptions,
         type: 'css',
+        // Using a custom importer to handle external paths
+        importers: [
+          {
+            findFileUrl(url) {
+              // Handle image paths that go outside the source directory
+              if (url.startsWith('../')) {
+                // Return null to let the default resolver handle it
+                return null;
+              }
+              
+              // Continue with normal imports
+              return null;
+            }
+          }
+        ]
       }),
+      // Add a custom URL resolver plugin
+      {
+        name: 'preserve-image-urls',
+        setup(build) {
+          // Handle asset URLs that go outside the build context
+          build.onResolve({ filter: /\.(png|jpg|jpeg|gif|svg|webp)$/ }, args => {
+            // Check if this is a relative URL going up directories
+            if (args.path.startsWith('../')) {
+              // Just preserve the URL as-is without trying to resolve it
+              return { external: true, path: args.path };
+            }
+            return null; // Let esbuild handle normal paths
+          });
+        }
+      },
       // Modify postcss-and-hmr plugin to only process changed files
       {
         name: 'postcss-and-hmr',
