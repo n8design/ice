@@ -3,10 +3,10 @@ import * as P from 'path';
 import { glob } from 'glob';
 import { HotReloadServer } from '@n8d/ice-hotreloader';
 import { BuildContext } from '../types';
-// UNCOMMENT THIS LINE to re-enable path aliases
 import { resolvePathAliases } from './path-alias-plugin';
-import { reportError } from '../utils';
+import { reportError, normalizePath } from '../utils'; // Import normalizePath from utils
 import * as fs from 'fs';
+import * as url from 'url';
 
 export async function setupTsProcessor(
   ctx: BuildContext,
@@ -30,8 +30,8 @@ export async function setupTsProcessor(
   }
   // --- END LOGGING ---
 
-  const outbase = P.join(ctx.projectDir, ctx.sourceDir);
-  const outdir = P.join(ctx.projectDir, ctx.outputDir);
+  const outbase = normalizePath(P.join(ctx.projectDir, ctx.sourceDir));
+  const outdir = normalizePath(P.join(ctx.projectDir, ctx.outputDir));
   const target = ctx.tsConfig?.compilerOptions?.target as string || 'es2020';
 
   const plugins: esbuild.Plugin[] = [];

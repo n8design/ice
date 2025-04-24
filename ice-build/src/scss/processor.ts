@@ -8,7 +8,7 @@ import autoprefixer from 'autoprefixer';
 import { glob } from 'glob';
 import { HotReloadServer } from '@n8d/ice-hotreloader';
 import { BuildContext } from '../types';
-import { reportError } from '../utils';
+import { reportError, normalizePath } from '../utils'; // Import normalizePath from utils
 
 export async function setupScssProcessor(
   ctx: BuildContext,
@@ -26,10 +26,14 @@ export async function setupScssProcessor(
     console.log(`[SCSS] Found ${entryPoints.length} entry points`);
   }
 
+  // Use in path operations:
+  const outdir = normalizePath(P.join(ctx.projectDir, ctx.outputDir));
+  const outbase = normalizePath(P.join(ctx.projectDir, ctx.sourceDir));
+
   return esbuild.context({
     entryPoints: entryPoints,
-    outdir: P.join(ctx.projectDir, ctx.outputDir),
-    outbase: P.join(ctx.projectDir, ctx.sourceDir),
+    outdir: outdir,
+    outbase: outbase,
     bundle: true,
     logLevel: ctx.isVerbose ? 'info' : 'warning',
     sourcemap: 'external',

@@ -45,7 +45,8 @@ export async function startBuild(): Promise<void> {
   const isVerbose = args.values.verbose;
 
   // --- Configuration Loading ---
-  const projectDir = process.cwd(); 
+  const projectDir = process.cwd();
+  // For Windows compatibility with ESM
   const projectDirUrl = process.platform === 'win32' 
     ? url.pathToFileURL(projectDir).href
     : projectDir;

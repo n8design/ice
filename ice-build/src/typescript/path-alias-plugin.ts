@@ -2,31 +2,30 @@ import * as path from 'path';
 import * as esbuild from 'esbuild';
 import * as url from 'url';
 
+// Add a normalization helper:
+function normalizePath(p: string): string {
+  return process.platform === 'win32' ? p.replace(/\\/g, '/') : p;
+}
+
 export function resolvePathAliases(
   projectDir: string,
   sourceDir: string,
   paths: Record<string, string[]>
 ): esbuild.Plugin {
   const aliases: Record<string, string> = {};
-  
-  // For Windows compatibility
-  const normalizePath = (path: string) => {
-    return process.platform === 'win32' 
-      ? path.replace(/\\/g, '/') 
-      : path;
-  };
 
   // Process tsconfig paths into esbuild format
   for (const [alias, targets] of Object.entries(paths)) {
     // Convert glob patterns like "@/*" to regex-compatible "@/"
     const normalizedAlias = alias.replace(/\*/g, '');
-    
+
     if (targets && targets.length > 0) {
       // Get first target and normalize (tsconfig typically uses the first entry)
       const target = targets[0].replace(/\*/g, '');
-      
+
       // Create full path but maintain the final segment for esbuild to append
-      aliases[normalizedAlias] = normalizePath(path.join(projectDir, target));
+      const targetPath = normalizePath(path.join(projectDir, target));
+      aliases[normalizedAlias] = targetPath;
     }
   }
 
