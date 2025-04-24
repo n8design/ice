@@ -11,6 +11,7 @@ import { loadProjectConfig, loadTsConfig, detectSourceDirectory } from './config
 import { reportError } from './utils';
 import { BuildContext, IceBuildConfig } from './types';
 import * as chokidar from 'chokidar';
+import * as url from 'url'; // Add this import
 
 export async function startBuild(): Promise<void> {
   const startTime = performance.now();
@@ -44,7 +45,11 @@ export async function startBuild(): Promise<void> {
   const isVerbose = args.values.verbose;
 
   // --- Configuration Loading ---
-  const projectDir = process.cwd();
+  const projectDir = process.cwd(); 
+  const projectDirUrl = process.platform === 'win32' 
+    ? url.pathToFileURL(projectDir).href
+    : projectDir;
+
   const loadedConfig: IceBuildConfig | undefined = await loadProjectConfig(projectDir);
 
   if (!loadedConfig) {

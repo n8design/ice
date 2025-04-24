@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as esbuild from 'esbuild';
+import * as url from 'url';
 
 export function resolvePathAliases(
   projectDir: string,
@@ -8,6 +9,13 @@ export function resolvePathAliases(
 ): esbuild.Plugin {
   const aliases: Record<string, string> = {};
   
+  // For Windows compatibility
+  const normalizePath = (path: string) => {
+    return process.platform === 'win32' 
+      ? path.replace(/\\/g, '/') 
+      : path;
+  };
+
   // Process tsconfig paths into esbuild format
   for (const [alias, targets] of Object.entries(paths)) {
     // Convert glob patterns like "@/*" to regex-compatible "@/"
@@ -18,7 +26,7 @@ export function resolvePathAliases(
       const target = targets[0].replace(/\*/g, '');
       
       // Create full path but maintain the final segment for esbuild to append
-      aliases[normalizedAlias] = path.join(projectDir, target);
+      aliases[normalizedAlias] = normalizePath(path.join(projectDir, target));
     }
   }
 
@@ -30,7 +38,7 @@ export function resolvePathAliases(
         build.onResolve({ filter: new RegExp(`^${escapeRegExp(alias)}`) }, args => {
           // Replace the alias prefix with the target path
           const importPath = args.path.replace(alias, target);
-          return { path: importPath };
+          return { path: process.platform === 'win32' ? url.pathToFileURL(importPath).href : importPath };
         });
       });
     }
