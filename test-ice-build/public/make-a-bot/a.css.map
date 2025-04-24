@@ -1,7 +1,7 @@
 {
   "version": 3,
-  "sources": ["../../source/a.scss"],
-  "sourcesContent": ["a{\n    content: \"Bot\"\n}"],
+  "sources": ["../../source/make-a-bot/a.scss"],
+  "sourcesContent": ["a{\r\n    content: \"Bot\"\r\n}"],
   "mappings": ";AAAA;AACI,WAAA;;",
   "names": []
 }

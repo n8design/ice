@@ -1,7 +1,7 @@
 {
   "version": 3,
-  "sources": ["../_partial-test.scss", "../styles.scss"],
-  "sourcesContent": [".content{\n    content: \"test\";\n    // background-color: lime;\n}", "@use 'partial-test' as pt;\n\n// filepath: test-ice-build/source/styles.scss\nbody {\n  background-color: #f0f0f0;\n  font-family: sans-serif;\n\n  h1 {\n    // color: navy;\n    text-decoration: underline;\n    // Example for autoprefixer\n    ::placeholder {\n      color: gray;\n      // background-color: lime;\n    }\n  }\n}"],
+  "sources": ["../source/_partial-test.scss", "../source/styles.scss"],
+  "sourcesContent": [".content{\r\n    content: \"test\";\r\n    // background-color: lime;\r\n}", "@use 'partial-test' as pt;\r\n\r\n// filepath: test-ice-build/source/styles.scss\r\nbody {\r\n  background-color: #f0f0f0;\r\n  font-family: sans-serif;\r\n\r\n  h1 {\r\n    // color: navy;\r\n    text-decoration: underline;\r\n    // Example for autoprefixer\r\n    ::placeholder {\r\n      color: gray;\r\n      // background-color: lime;\r\n    }\r\n  }\r\n}"],
   "mappings": ";AAAA,CAAA;AACI,WAAA;;ACEJ;AACE,oBAAA;AACA,eAAA;;AAEA,KAAA;AAEE,mBAAA;;AAEA,KAAA,GAAA;AACE,SAAA;;",
   "names": []
 }

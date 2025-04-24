@@ -1,7 +1,7 @@
 {
   "version": 3,
-  "sources": ["../moses.scss"],
-  "sourcesContent": [".mose{\n    content: \"was a good man\";\n}"],
+  "sources": ["../source/moses.scss"],
+  "sourcesContent": [".mose{\r\n    content: \"was a good man\";\r\n}"],
   "mappings": ";AAAA,CAAA;AACI,WAAA;;",
   "names": []
 }

@@ -1,7 +1,7 @@
 {
   "version": 3,
-  "sources": ["../just-anither-file.scss"],
-  "sourcesContent": [".another{\n    content: \"Just another content\";\n}"],
+  "sources": ["../source/just-anither-file.scss"],
+  "sourcesContent": [".another{\r\n    content: \"Just another content\";\r\n}"],
   "mappings": ";AAAA,CAAA;AACI,WAAA;;",
   "names": []
 }

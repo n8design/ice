@@ -1,7 +1,7 @@
 {
   "version": 3,
-  "sources": ["../_make.scss", "../_make2.scss", "../_make3.scss", "../_make4.scss", "../hello-world.scss"],
-  "sourcesContent": [".cotnent2{\n    content: \"ajsldk alsdk \"\n}", ".hell{\n    content: 'oworld';\n}", ".a-maker-bot{\n    content: \"a new maker bot is in town\"\n}", ".another{\n    content: \"Brick in the wall\"\n}", "@use 'make' as make;\n@use 'make2' as make2;\n@use 'make3' as make3;\n@use 'make4' as make4;\n\n.content{\n    content: \"Just another content\";\n}\n\n\n"],
-  "mappings": ";AAAA,CAAA;AACI,WAAA;;ACDJ,CAAA;AACI,WAAA;;ACDJ,CAAA;AACI,WAAA;;ACDJ,CAAA;AACI,WAAA;;ACIJ,CAAA;AACI,WAAA;;",
+  "sources": ["../source/_make.scss", "../source/_make2.scss", "../source/_make3.scss", "../source/_make4.scss", "../source/hello-world.scss"],
+  "sourcesContent": [".cotnent2{\r\n    content: \"ajsldk alsdk \"\r\n}", ".hell{\r\n    content: 'oworld';\r\n    background-color: pink;\r\n}", ".a-maker-bot{\r\n    content: \"a new maker bot is in town\"\r\n}", ".another{\r\n    content: \"Brick in the wall\"\r\n}", "@use 'make' as make;\r\n@use 'make2' as make2;\r\n@use 'make3' as make3;\r\n@use 'make4' as make4;\r\n\r\n.content{\r\n    content: \"Just another content\";\r\n}\r\n\r\n\r\n"],
+  "mappings": ";AAAA,CAAA;AACI,WAAA;;ACDJ,CAAA;AACI,WAAA;AACA,oBAAA;;ACFJ,CAAA;AACI,WAAA;;ACDJ,CAAA;AACI,WAAA;;ACIJ,CAAA;AACI,WAAA;;",
   "names": []
 }
