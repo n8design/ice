@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../source/a.scss"],
-  "sourcesContent": ["a{\n    content: \"Bot\"\n}"],
-  "mappings": ";AAAA;AACI,WAAA;;",
-  "names": []
-}

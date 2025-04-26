@@ -1,2 +1,2 @@
-export * from './default-configs';
-export * from './config-loader';
+export * from './default-configs.js'; // Add .js
+export * from './config-loader.js';   // Add .js

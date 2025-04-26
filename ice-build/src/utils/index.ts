@@ -1,3 +1,2 @@
-export * from './error-reporting'; // Corrected from error-handler
-// Export path utilities
-export * from './path-utils';
+export * from './error-reporting.js'; // Add .js
+export * from './path-utils.js';    // Add .js

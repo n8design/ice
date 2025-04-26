@@ -77,6 +77,21 @@ export async function setupScssProcessor(
         name: 'scss-hmr-notify',
         setup(build) {
           build.onEnd(result => {
+            console.log('[DEBUG SCSS onEnd] Triggered.'); // <-- Add Log
+            console.log(`[DEBUG SCSS onEnd] Errors reported by esbuild: ${result.errors.length}`); // <-- Add Log
+            // Optional: Log the actual errors
+            // if (result.errors.length > 0) {
+            //   console.log('[DEBUG SCSS onEnd] Errors:', JSON.stringify(result.errors, null, 2));
+            // }
+
+            // Explicitly check for errors here too for robustness
+            if (result.errors.length > 0) {
+               console.log('[DEBUG SCSS onEnd] Errors detected, suppressing HMR.'); // <-- Add Log
+               // Optionally call reportError here as well if esbuild logLevel isn't sufficient
+               // reportError('SCSS build', result.errors.map(e => e.text).join('\n'), ctx.isVerbose);
+               return; // Prevent HMR notification on error
+            }
+
             if (!hmr || !result.metafile) return;
             
             const publicDir = P.join(ctx.projectDir, ctx.outputDir);
@@ -97,6 +112,7 @@ export async function setupScssProcessor(
                 }
               }
             }
+            console.log('[DEBUG SCSS onEnd] No errors, proceeding with HMR notify.'); // <-- Add Log
           });
         }
       }

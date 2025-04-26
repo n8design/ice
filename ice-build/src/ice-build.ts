@@ -5,13 +5,14 @@ import { performance } from 'perf_hooks';
 import { parseArgs } from 'node:util';
 import * as esbuild from 'esbuild';
 import { HotReloadServer } from '@n8d/ice-hotreloader';
-import { setupScssProcessor } from './scss';
-import { setupTsProcessor } from './typescript';
-import { loadProjectConfig, loadTsConfig, detectSourceDirectory } from './config';
-import { reportError } from './utils';
-import { BuildContext, IceBuildConfig } from './types';
+// Add .js extensions
+import { setupScssProcessor } from './scss/index.js';
+import { setupTsProcessor } from './typescript/index.js';
+import { loadProjectConfig, loadTsConfig, detectSourceDirectory } from './config/index.js';
+import { reportError } from './utils/index.js';
+import { BuildContext, IceBuildConfig } from './types.js';
 import * as chokidar from 'chokidar';
-import * as url from 'url'; // Add this import
+import * as url from 'url'; // Keep this import for pathToFileURL if used later
 
 export async function startBuild(): Promise<void> {
   const startTime = performance.now();
@@ -123,14 +124,14 @@ export async function startBuild(): Promise<void> {
       // Initial build and start esbuild's watch mode (this handles changes to existing files)
       console.log('Initial build starting...');
       await Promise.all([
-        scssContext.rebuild(),
-        tsContext.rebuild()
+        scssContext?.rebuild() ?? Promise.resolve(), // Use ?.
+        tsContext?.rebuild() ?? Promise.resolve()   // Use ?.
       ]);
       console.log('Initial build complete. Watching for changes...');
       
       // Start esbuild watching (for changes to EXISTING files)
-      scssContext.watch();
-      tsContext.watch();
+      scssContext?.watch(); // Use ?.
+      tsContext?.watch();   // Use ?.
       
       // Add directory watcher to detect NEW files
       const watcher = chokidar.watch(
@@ -150,20 +151,18 @@ export async function startBuild(): Promise<void> {
           if (!path.basename(filePath).startsWith('_')) {
             console.log('Rebuilding SCSS context with new entry points...');
             // Dispose old context and create a new one
-            await scssContext?.dispose();
+            await scssContext?.dispose(); // Use ?.
             scssContext = await setupScssProcessor(ctx, hmr!, scssFilesCount);
-            await scssContext.rebuild();
-            // CRITICAL ADDITION: Restart watch mode on the new context
-            scssContext.watch();
+            await scssContext?.rebuild(); // Add null check here
+            scssContext?.watch();
           }
-        } else if (filePath.endsWith('.ts')) {
+        } else if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) { // Ensure .tsx is handled
           console.log('Rebuilding TypeScript context with new entry points...');
           // Dispose old context and create a new one
-          await tsContext?.dispose();
+          await tsContext?.dispose(); // Use ?.
           tsContext = await setupTsProcessor(ctx, hmr!, tsFilesCount);
-          await tsContext.rebuild();
-          // CRITICAL ADDITION: Restart watch mode on the new context
-          tsContext.watch();
+          await tsContext?.rebuild(); // Add null check here
+          tsContext?.watch();
         }
       });
       
@@ -172,11 +171,11 @@ export async function startBuild(): Promise<void> {
     } else {
       // Single build run
       await Promise.all([
-        scssContext.rebuild(),
-        tsContext.rebuild()
+        scssContext?.rebuild() ?? Promise.resolve(), // Use ?.
+        tsContext?.rebuild() ?? Promise.resolve()   // Use ?.
       ]);
-      await scssContext.dispose();
-      await tsContext.dispose();
+      await scssContext?.dispose(); // Use ?.
+      await tsContext?.dispose();   // Use ?.
     }
 
   } catch (error) {
@@ -192,8 +191,8 @@ export async function startBuild(): Promise<void> {
       console.log('\nShutting down...');
       // Dispose contexts on shutdown
       await Promise.allSettled([
-        scssContext?.dispose(),
-        tsContext?.dispose(),
+        scssContext?.dispose() ?? Promise.resolve(), // Use ?.
+        tsContext?.dispose() ?? Promise.resolve(),   // Use ?.
       ]);
       console.log('Build contexts disposed. HMR server stopped.');
       process.exit(0);

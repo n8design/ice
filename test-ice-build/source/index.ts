@@ -19,5 +19,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 console.log('DOM fully loaded and parsed');
+let testVar: number = "this is definitely not a number";
 
+consoel.debug('Debugging information:');
 
+// ... existing code ...
+
+// Add an invalid JavaScript syntax error
+function invalidSyntax( { // Missing closing brace
+
+  console.log("This line won't be reached if parsing fails");

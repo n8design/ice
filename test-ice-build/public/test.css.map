@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../test.scss"],
-  "sourcesContent": ["body{\n    content: \"Is ok\";\n    background-color: lime;\n}"],
-  "mappings": ";AAAA;AACI,WAAA;AACA,oBAAA;;",
-  "names": []
-}

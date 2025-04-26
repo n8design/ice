@@ -1,2 +1,2 @@
-export * from './path-aliases';
-export * from './processor';
+export * from './path-aliases.js'; // Add .js
+export * from './processor.js';    // Add .js
