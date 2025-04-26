@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../source/make-a-bot/b.bot.scss"],
-  "sourcesContent": [".bo-bot{\r\n    content: \"Be bot\";\r\n    background: url('https://example.com/image.png');\r\n}"],
-  "mappings": ";AAAA,CAAA;AACI,WAAA;AACA,cAAA;;",
-  "names": []
-}

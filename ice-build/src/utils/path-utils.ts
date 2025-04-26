@@ -1,66 +1,67 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { fileURLToPath, pathToFileURL } from 'url';
+import { fileURLToPath, pathToFileURL as nodePathToFileURL } from 'url';
 
 /**
- * Normalize a file path for the current platform
+ * Normalize a file path to use forward slashes consistently.
  */
 export function normalizePath(filePath: string): string {
-  return filePath.replace(/[\/\\]/g, path.sep);
+  return filePath.replace(/\\/g, '/');
 }
 
 /**
- * Resolve paths in a cross-platform way
+ * Join path segments using POSIX separators, then normalize.
+ * Useful for generating paths for external tools or configurations.
  */
-export function resolvePath(...pathSegments: string[]): string {
-  return path.resolve(...pathSegments);
+export function joinPosixPath(...segments: string[]): string {
+  return normalizePath(path.posix.join(...segments));
 }
 
 /**
- * Join paths in a cross-platform way
+ * Resolve path segments using POSIX separators, then normalize.
  */
-export function joinPath(...pathSegments: string[]): string {
-  return path.join(...pathSegments);
+export function resolvePosixPath(...segments: string[]): string {
+  return normalizePath(path.posix.resolve(...segments));
 }
 
 /**
- * Convert a file URL to a path
+ * Get the directory name using POSIX separators.
+ */
+export function posixDirname(filePath: string): string {
+  return path.posix.dirname(normalizePath(filePath));
+}
+
+/**
+ * Get the base name using POSIX separators.
+ */
+export function posixBasename(filePath: string, ext?: string): string {
+  return path.posix.basename(normalizePath(filePath), ext);
+}
+
+/**
+ * Get the extension name using POSIX separators.
+ */
+export function posixExtname(filePath: string): string {
+  return path.posix.extname(normalizePath(filePath));
+}
+
+/**
+ * Convert a file URL (string) to a normalized path.
  */
 export function fileUrlToPath(fileUrl: string): string {
-  return fileURLToPath(fileUrl);
+  return normalizePath(fileURLToPath(fileUrl));
 }
 
 /**
- * Convert a path to a file URL
- * Critical for ESM imports on Windows
+ * Convert a normalized file path to a file URL string.
+ * Handles Windows drive letters correctly.
  */
-export function pathToUrl(filePath: string): URL {
-  return pathToFileURL(filePath);
+export function pathToFileURL(filePath: string): string {
+  return nodePathToFileURL(filePath).href;
 }
 
 /**
- * Get the directory name from a path
- */
-export function getDirname(filePath: string): string {
-  return path.dirname(filePath);
-}
-
-/**
- * Get the file name from a path
- */
-export function getBasename(filePath: string, ext?: string): string {
-  return path.basename(filePath, ext);
-}
-
-/**
- * Get the extension of a file
- */
-export function getExtension(filePath: string): string {
-  return path.extname(filePath);
-}
-
-/**
- * Check if path exists
+ * Check if path exists using fs.accessSync.
  */
 export function pathExists(filePath: string): boolean {
   try {
@@ -72,36 +73,11 @@ export function pathExists(filePath: string): boolean {
 }
 
 /**
- * Ensure directory exists, create it if it doesn't
+ * Ensure directory exists, create it recursively if it doesn't.
  */
 export function ensureDir(dirPath: string): void {
   if (!pathExists(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
+    // Use native path separator for mkdirSync
+    fs.mkdirSync(path.normalize(dirPath), { recursive: true });
   }
-}
-
-/**
- * Get platform-specific path separator
- */
-export const separator = path.sep;
-
-/**
- * Parse a path into its components
- */
-export function parsePath(filePath: string): path.ParsedPath {
-  return path.parse(filePath);
-}
-
-/**
- * Get relative path between two paths
- */
-export function relativePath(from: string, to: string): string {
-  return path.relative(from, to);
-}
-
-/**
- * Check if a path is absolute
- */
-export function isAbsolutePath(filePath: string): boolean {
-  return path.isAbsolute(filePath);
 }

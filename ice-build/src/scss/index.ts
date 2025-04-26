@@ -1,1 +1,1 @@
-export { setupScssProcessor } from './processor';
+export { setupScssProcessor } from './processor.js'; // Add .js

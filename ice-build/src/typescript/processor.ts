@@ -2,10 +2,9 @@ import * as esbuild from 'esbuild';
 import * as P from 'path';
 import { glob } from 'glob';
 import { HotReloadServer } from '@n8d/ice-hotreloader';
-import { BuildContext } from '../types';
-// UNCOMMENT THIS LINE to re-enable path aliases
-import { resolvePathAliases } from './path-alias-plugin';
-import { reportError } from '../utils';
+import { BuildContext } from '../types.js'; // Add .js
+import { resolvePathAliases } from './path-alias-plugin.js'; // Add .js
+import { reportError } from '../utils/index.js'; // Add .js (assuming index.js exists in utils)
 import * as fs from 'fs';
 
 export async function setupTsProcessor(
@@ -57,30 +56,23 @@ export async function setupTsProcessor(
   // --- HMR Notify Plugin ---
   plugins.push({
     name: 'ts-hmr-notify',
-    setup(build: esbuild.PluginBuild) {
-      build.onEnd(async (result: esbuild.BuildResult) => {
-        if (!hmr) return; // Don't run HMR logic if not in watch mode
-        if (result.errors.length > 0) return;
-        if (!result.metafile) {
-          console.warn('TS build finished, but metafile is missing for HMR.');
-          return;
-        }
+    setup(build) {
+      build.onEnd(result => {
+        console.log('[DEBUG TS onEnd] Triggered.'); // <-- Add Log
+        console.log(`[DEBUG TS onEnd] Errors reported by esbuild: ${result.errors.length}`); // <-- Add Log
+        // Optional: Log the actual errors
+        // if (result.errors.length > 0) {
+        //   console.log('[DEBUG TS onEnd] Errors:', JSON.stringify(result.errors, null, 2));
+        // }
 
-        let processedCount = 0;
-        for (const outputPath in result.metafile.outputs) {
-          if (!outputPath.endsWith('.js')) continue;
-          processedCount++;
-          try {
-            const hmrPath = P.relative(outdir, outputPath).replace(/\\/g, '/');
-            hmr.notifyClients('full', hmrPath); // Use the imported hmr instance
-            console.log(`[${new Date().toLocaleTimeString()}] 🔄 JS update: ${hmrPath}`);
-            tsFilesCount.value++;
-          } catch (error) {
-            reportError(`TS HMR (${P.basename(outputPath)})`, error as Error, ctx.isVerbose);
-          }
-        }
-        if (processedCount > 0 && ctx.isVerbose) {
-          console.log(`Notified HMR for ${processedCount} JS files.`);
+        if (!hmr) return;
+
+        if (result.errors.length > 0) {
+          console.log('[DEBUG TS onEnd] Calling reportError...'); // Your debug log
+          // --->>> THIS LINE REPORTS ESBUILD ERRORS <<<---
+          reportError('TypeScript build', result.errors.map(e => e.text).join('\n'), ctx.isVerbose);
+        } else {
+          // ... success logic ...
         }
       });
     }
