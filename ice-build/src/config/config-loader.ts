@@ -1,8 +1,10 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { IceBuildConfig } from '../types';
-import { DEFAULT_CONFIG, DEFAULT_TS_CONFIG } from './default-configs'; // Add DEFAULT_TS_CONFIG
-import { reportError } from '../utils/error-reporting';
+import ts from 'typescript';
+// --->>> ADD .js EXTENSIONS <<<---
+import { IceBuildConfig } from '../types.js';
+import { DEFAULT_CONFIG, DEFAULT_TS_CONFIG } from './default-configs.js';
+import { reportError } from '../utils/error-reporting.js';
 
 export async function loadProjectConfig(projectDir: string): Promise<IceBuildConfig> {
   // Try to find a config file in the project
@@ -37,55 +39,74 @@ export async function loadProjectConfig(projectDir: string): Promise<IceBuildCon
   return DEFAULT_CONFIG;
 }
 
-export async function loadTsConfig(projectDir: string, config: IceBuildConfig): Promise<Record<string, unknown>> {
-  // Use config from ice-build config if provided
-  if (config.typescriptOptions) {
-    console.log('Using TypeScript configuration from ice-build config');
-    return { 
-      compilerOptions: { 
-        ...DEFAULT_TS_CONFIG.compilerOptions, 
-        ...config.typescriptOptions 
-      } 
-    };
+// --->>> CHANGE RETURN TYPE AND IMPLEMENTATION <<<---
+export async function loadTsConfig(projectDir: string, config: IceBuildConfig): Promise<ts.ParsedCommandLine | undefined> {
+  // Use config from ice-build config if provided (This part might need adjustment
+  // depending on how typescriptOptions is intended to work. For now, we prioritize tsconfig.json)
+  // if (config.typescriptOptions) {
+  //   console.log('Using TypeScript configuration from ice-build config');
+  //   // This is tricky - creating a full ParsedCommandLine from raw options isn't straightforward.
+  //   // It's better to rely on tsconfig.json or defaults for now.
+  //   // Consider removing typescriptOptions from IceBuildConfig or refining its purpose.
+  // }
+
+  const tsconfigPath = ts.findConfigFile(projectDir, ts.sys.fileExists, 'tsconfig.json');
+
+  if (!tsconfigPath) {
+    console.log('No tsconfig.json found, using default TypeScript settings');
+    // Parse default options into a ParsedCommandLine structure
+    // Note: This might not be fully equivalent to a real file parse, but provides the structure.
+    // You might need to adjust default options based on project needs.
+    const defaultParsed = ts.parseJsonConfigFileContent(
+        DEFAULT_TS_CONFIG, // Use the default config object
+        ts.sys,
+        projectDir
+    );
+    // Report potential errors in default config parsing (unlikely but possible)
+    if (defaultParsed.errors.length > 0) {
+        reportError('Default TSConfig Parsing', defaultParsed.errors.map(e => ts.flattenDiagnosticMessageText(e.messageText, '\n')).join('\n'));
+    }
+    return defaultParsed;
   }
 
-  // Try to find tsconfig.json in the project directory
-  const tsconfigPath = path.join(projectDir, 'tsconfig.json');
-  
   try {
-    // Check if tsconfig exists
-    await fs.access(tsconfigPath);
     console.log(`Found TypeScript config at: ${tsconfigPath}`);
-    
-    try {
-      // Read and parse tsconfig.json
-      const tsconfigContent = await fs.readFile(tsconfigPath, 'utf-8');
-      
-      // Try to remove comments from JSON before parsing
-      const jsonContent = tsconfigContent.replace(/\/\/.*$/gm, '');
-      const tsconfig = JSON.parse(jsonContent) as Record<string, unknown>;
-      
-      console.log('Using project TypeScript configuration');
-      return tsconfig;
-    } catch (parseError) {
-      console.error(`Error parsing tsconfig.json: ${(parseError as Error).message}`);
+    const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
+
+    if (configFile.error) {
+      reportError('TSConfig Read', ts.flattenDiagnosticMessageText(configFile.error.messageText, '\n'));
       console.log('Falling back to default TypeScript settings');
-      return DEFAULT_TS_CONFIG;
+      // Return default parsed options on read error
+      return ts.parseJsonConfigFileContent(DEFAULT_TS_CONFIG, ts.sys, projectDir);
     }
+
+    // Parse the config file content relative to its directory
+    const parsedConfig = ts.parseJsonConfigFileContent(
+      configFile.config,
+      ts.sys,
+      path.dirname(tsconfigPath) // Use the directory of tsconfig.json as the base path
+    );
+
+    if (parsedConfig.errors.length > 0) {
+      reportError('TSConfig Parsing', parsedConfig.errors.map(e => ts.flattenDiagnosticMessageText(e.messageText, '\n')).join('\n'));
+      // Decide if you want to proceed with errors or fallback
+      // console.log('Falling back to default TypeScript settings due to parsing errors');
+      // return ts.parseJsonConfigFileContent(DEFAULT_TS_CONFIG, ts.sys, projectDir);
+    }
+
+    console.log('Using project TypeScript configuration');
+    return parsedConfig; // Return the fully parsed command line options
+
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      console.log('No tsconfig.json found, using default TypeScript settings');
-    } else {
-      reportError('TypeScript config access', error as Error);
-      console.log('Falling back to default TypeScript settings');
-    }
-    
-    return DEFAULT_TS_CONFIG;
+    reportError('TSConfig Load/Parse', error as Error);
+    console.log('Falling back to default TypeScript settings');
+    // Return default parsed options on unexpected errors
+    return ts.parseJsonConfigFileContent(DEFAULT_TS_CONFIG, ts.sys, projectDir);
   }
 }
 
 export async function detectSourceDirectory(
-  projectDir: string, 
+  projectDir: string,
   config: IceBuildConfig
 ): Promise<string> {
   // If sourceDir is specified in config, use that

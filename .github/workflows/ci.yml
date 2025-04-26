@@ -1,9 +1,8 @@
-# filepath: /Volumes/Code/n8design/projects/ice/.github/workflows/ci.yml
 name: Ice Build CI
 
 on:
   push:
-    branches: [ main, winfx ] # Adjust branches as needed
+    branches: [ main, winfix ] # Adjust branches as needed
   pull_request:
     branches: [ main ]
 
@@ -36,7 +35,10 @@ jobs:
     - name: Run Unit Tests (ice-build)
       run: npm run test --workspace=@n8d/ice-build # Assumes 'test' script runs vitest
 
+    # --->>> ADD THIS BUILD STEP <<<---
+    - name: Build ice package
+      run: npm run build # Assumes 'build' script compiles the package
+
     - name: Run Integration Tests (ice-build)
       run: npm run test:integration --workspace=@n8d/ice-build # Assumes 'test:integration' runs the shell script
-      # For Windows, ensure bash is available or adapt the integration test script
       shell: bash # Explicitly use bash for the integration test step if needed

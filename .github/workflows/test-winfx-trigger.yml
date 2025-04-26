@@ -1,0 +1,13 @@
+# filepath: /Volumes/Code/n8design/projects/ice/.github/workflows/test-winfx-trigger.yml
+name: Test WinFX Trigger
+
+on:
+  push:
+    branches: [ winfix ] # ONLY target winfx
+
+jobs:
+  test_trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Message
+        run: echo "Workflow triggered on winfx branch!"

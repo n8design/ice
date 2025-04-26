@@ -70,16 +70,15 @@ export function pathExists(filePath: string): boolean {
   } catch {
     return false;
   }
-  
 }
 
 /**
- * Normalizes file paths to use forward slashes, which is important
- * for cross-platform compatibility, especially in Windows environments.
- * 
- * @param p The path to normalize
- * @returns The normalized path with forward slashes
+ * Ensure directory exists, create it recursively if it doesn't.
  */
-export function normalizePath(p: string): string {
-  return process.platform === 'win32' ? p.replace(/\\/g, '/') : p;
+export function ensureDir(dirPath: string): void {
+  if (!pathExists(dirPath)) {
+    // Use native path separator for mkdirSync
+    fs.mkdirSync(path.normalize(dirPath), { recursive: true });
+  }
 }
+

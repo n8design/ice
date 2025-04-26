@@ -1,12 +1,11 @@
 import { AcceptedPlugin } from 'postcss';
-// Correct import for SassPluginOptions
 import { SassPluginOptions } from 'esbuild-sass-plugin';
-import { TsconfigRaw } from 'esbuild';
+import ts from 'typescript';
 
 export interface IceBuildConfig {
   sourceDir?: string;
   outputDir?: string;
-  sassOptions?: SassPluginOptions; // Use correct imported type
+  sassOptions?: SassPluginOptions;
   postcssPlugins?: AcceptedPlugin[];
   typescriptOptions?: Record<string, unknown>;
   port?: number;
@@ -18,7 +17,7 @@ export interface BuildContext {
   sourceDir: string;
   outputDir: string;
   config: IceBuildConfig;
-  tsConfig: TsconfigRaw | null;
+  tsConfig: ts.ParsedCommandLine | undefined;
   watchMode: boolean;
   isVerbose: boolean;
 }
