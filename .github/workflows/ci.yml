@@ -3,7 +3,7 @@ name: Ice Build CI
 
 on:
   push:
-    branches: [ main, winfx ] # Adjust branches as needed
+    branches: [ main, winfix ] # Adjust branches as needed
   pull_request:
     branches: [ main ]
 

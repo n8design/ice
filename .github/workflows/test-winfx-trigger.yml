@@ -3,7 +3,7 @@ name: Test WinFX Trigger
 
 on:
   push:
-    branches: [ winfx ] # ONLY target winfx
+    branches: [ winfix ] # ONLY target winfx
 
 jobs:
   test_trigger:
