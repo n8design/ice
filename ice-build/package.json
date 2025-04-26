@@ -22,12 +22,12 @@
     "assets"
   ],
   "scripts": {
-    "clean": "rm -rf dist",
+    "clean": "node -e \"if(require('fs').existsSync('dist')) require('fs').rmSync('dist', {recursive:true, force:true})\"",
     "build:tsc": "tsc --outDir dist --declaration true",
     "build:esbuild": "esbuild ./src/ice-build.ts --bundle --outfile=dist/ice-build.js --platform=node --format=esm --external:chokidar --external:glob --external:esbuild-sass-plugin --external:@n8d/ice-hotreloader --external:jiti --external:autoprefixer --external:postcss --external:browserslist --external:esbuild --external:eslint --external:typescript",
     "build": "npm run clean && npm run build:esbuild",
-    "watch": "tsx ./bin/cli.js --watch",
-    "dev": "tsx ./bin/cli.js",
+    "watch": "node ./bin/cli.js --watch",
+    "dev": "node ./bin/cli.js",
     "lint": "eslint ."
   },
   "dependencies": {

@@ -18,5 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
     app.textContent = message;
   }
 });
+console.log('DOM fully loaded and parsed');
 
 
