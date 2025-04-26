@@ -36,8 +36,8 @@ jobs:
       run: npm run test --workspace=@n8d/ice-build # Assumes 'test' script runs vitest
 
     # --->>> ADD THIS BUILD STEP <<<---
-    - name: Build ice-build package
-      run: npm run build --workspace=@n8d/ice-build # Assumes 'build' script compiles the package
+    - name: Build ice package
+      run: npm run build # Assumes 'build' script compiles the package
 
     - name: Run Integration Tests (ice-build)
       run: npm run test:integration --workspace=@n8d/ice-build # Assumes 'test:integration' runs the shell script
