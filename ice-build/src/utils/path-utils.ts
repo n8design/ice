@@ -81,3 +81,4 @@ export function ensureDir(dirPath: string): void {
     fs.mkdirSync(path.normalize(dirPath), { recursive: true });
   }
 }
+
