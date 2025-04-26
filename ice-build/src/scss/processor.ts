@@ -1,57 +1,66 @@
 import * as esbuild from 'esbuild';
 import * as P from 'path';
-import * as fs from 'fs';
-// Switch to a different plugin approach
-import { sassPlugin } from 'esbuild-sass-plugin';
-import postcss from 'postcss';
-import autoprefixer from 'autoprefixer';
 import { glob } from 'glob';
 import { HotReloadServer } from '@n8d/ice-hotreloader';
-import { BuildContext } from '../types.js'; // Add .js
-import { reportError } from '../utils/index.js'; // Add .js (assuming index.js exists in utils)
+import { sassPlugin } from 'esbuild-sass-plugin';
+import { BuildContext } from '../types.js';
+import { reportError } from '../utils/index.js';
+// --->>> IMPORT normalizePath <<<---
+import { normalizePath, joinPosixPath, resolvePosixPath } from '../utils/path-utils.js';
 
 export async function setupScssProcessor(
   ctx: BuildContext,
-  hmr: HotReloadServer,
+  hmr: HotReloadServer | null, // Allow null hmr
   scssFilesCount: { value: number }
 ): Promise<esbuild.BuildContext> {
 
-  // ... (glob logic remains the same) ...
+  // Glob for non-partial SCSS files
+  const entryPointPattern = joinPosixPath(ctx.projectDir, ctx.sourceDir, '**/*.scss');
+  console.log(`[SCSS Processor] Glob pattern: ${entryPointPattern}`);
+
+  const allScssFiles = await glob(entryPointPattern, {
+    ignore: ['node_modules/**'],
+    absolute: true, // Use absolute paths
+    nodir: true,
+  });
+
+  // --->>> DEFINE entryPoints by filtering out partials <<<---
+  const entryPoints = allScssFiles.filter(file => !P.basename(file).startsWith('_'));
+
+  console.log(`[SCSS Processor] Raw glob results (non-partials): ${JSON.stringify(entryPoints)}`);
+  const normalizedEntryPoints = entryPoints.map(normalizePath); // Use imported normalizePath
+  console.log(`[SCSS Processor] Normalized entry points for esbuild: ${JSON.stringify(normalizedEntryPoints)}`);
+
+  if (normalizedEntryPoints.length === 0) {
+    console.warn('[SCSS Processor] Warning: No SCSS entry points found.');
+  }
 
   // Ensure outbase and outdir are absolute and normalized
-  const outbase = normalizePath(P.resolve(ctx.projectDir, ctx.sourceDir));
-  // --->>> CHANGE THIS LINE <<<---
-  const outdir = normalizePath(P.resolve(ctx.projectDir, ctx.outputDir, 'dist')); // Add 'dist'
+  const outbase = normalizePath(P.resolve(ctx.projectDir, ctx.sourceDir)); // Use imported normalizePath
+  const outdir = normalizePath(P.resolve(ctx.projectDir, ctx.outputDir, 'dist')); // Use imported normalizePath
 
-  console.log(`[SCSS Processor] esbuild outDir: ${outdir}`); // Log absolute paths
-  console.log(`[SCSS Processor] esbuild outBase: ${outbase}`); // Log absolute paths
+  console.log(`[SCSS Processor] esbuild outDir: ${outdir}`);
+  console.log(`[SCSS Processor] esbuild outBase: ${outbase}`);
 
 
   return esbuild.context({
-    entryPoints: entryPoints.map(normalizePath), // Ensure entry points are normalized here too
-    outdir: outdir,           // Use updated outdir
+    entryPoints: normalizedEntryPoints, // Use normalizedEntryPoints which uses normalizePath
+    outdir: outdir,
     outbase: outbase,
-    bundle: true,
-    logLevel: ctx.isVerbose ? 'info' : 'warning',
-    sourcemap: 'external',
-    write: true,
-    metafile: true,
+    // ... rest of options ...
     plugins: [
-      // Add a custom URL resolver plugin BEFORE sass processing
+      // ... ignore-image-urls plugin ...
       {
         name: 'ignore-image-urls',
-        setup(build) {
-          // This runs before sass processing to handle URL patterns
-          build.onResolve({ filter: /\.(png|jpg|jpeg|gif|svg|webp)($|\?)/ }, (args) => {
+        setup(build: esbuild.PluginBuild) {
+          build.onResolve({ filter: /\.(png|jpg|jpeg|gif|svg|webp)($|\?)/ }, (args: esbuild.OnResolveArgs) => {
             if (ctx.isVerbose) {
               console.log(`[URL Resolver] Ignoring image reference: ${args.path}`);
             }
-            // Return a path that will be ignored
             return { path: args.path, external: true };
           });
-          
-          // Also catch /images/ paths specifically
-          build.onResolve({ filter: /^\/images\// }, (args) => {
+
+          build.onResolve({ filter: /^\/images\// }, (args: esbuild.OnResolveArgs) => {
             if (ctx.isVerbose) {
               console.log(`[URL Resolver] Ignoring image path: ${args.path}`);
             }
@@ -59,57 +68,46 @@ export async function setupScssProcessor(
           });
         }
       },
-      
-      // Then the sass plugin with minimal options
       sassPlugin({
         type: 'css',
-        loadPaths: [P.join(ctx.projectDir, ctx.sourceDir)],
+        loadPaths: [normalizePath(P.join(ctx.projectDir, ctx.sourceDir))], // Use imported normalizePath
         ...ctx.config.sassOptions,
         sourceMap: true,
         sourceMapIncludeSources: true
       }),
-      
-      // HMR notify plugin remains the same
+      // ... scss-hmr-notify plugin ...
       {
         name: 'scss-hmr-notify',
-        setup(build) {
-          build.onEnd(result => {
-            console.log('[DEBUG SCSS onEnd] Triggered.'); // <-- Add Log
-            console.log(`[DEBUG SCSS onEnd] Errors reported by esbuild: ${result.errors.length}`); // <-- Add Log
-            // Optional: Log the actual errors
-            // if (result.errors.length > 0) {
-            //   console.log('[DEBUG SCSS onEnd] Errors:', JSON.stringify(result.errors, null, 2));
-            // }
+        setup(build: esbuild.PluginBuild) {
+          build.onEnd((result: esbuild.BuildResult) => {
+            console.log('[DEBUG SCSS onEnd] Triggered.');
+            console.log(`[DEBUG SCSS onEnd] Errors reported by esbuild: ${result.errors.length}`);
+            console.log(`[DEBUG SCSS onEnd] Warnings reported by esbuild: ${result.warnings.length}`);
 
-            // Explicitly check for errors here too for robustness
+            if (!result.metafile) {
+                console.log('[DEBUG SCSS onEnd] No metafile found.');
+                return;
+            }
+
+            const outputCount = Object.keys(result.metafile.outputs).filter(f => f.endsWith('.css')).length;
+            console.log(`[DEBUG SCSS onEnd] Metafile CSS output count: ${outputCount}`);
+            scssFilesCount.value = outputCount;
+
             if (result.errors.length > 0) {
-               console.log('[DEBUG SCSS onEnd] Errors detected, suppressing HMR.'); // <-- Add Log
-               // Optionally call reportError here as well if esbuild logLevel isn't sufficient
-               // reportError('SCSS build', result.errors.map(e => e.text).join('\n'), ctx.isVerbose);
-               return; // Prevent HMR notification on error
+               console.log('[DEBUG SCSS onEnd] Errors detected, suppressing HMR.');
+               return;
             }
 
-            if (!hmr || !result.metafile) return;
-            
-            const publicDir = P.join(ctx.projectDir, ctx.outputDir);
-            let count = 0;
-            
-            for (const outputPath in result.metafile.outputs) {
-              if (!outputPath.endsWith('.css')) continue;
-              count++;
-              scssFilesCount.value++;
-              
-              if (hmr) {
-                try {
-                  const hmrPath = P.relative(publicDir, outputPath).replace(/\\/g, '/');
-                  hmr.notifyClients('css', hmrPath);
-                  console.log(`[${new Date().toLocaleTimeString()}] 📤 CSS update: ${hmrPath}`);
-                } catch (e) {
-                  console.error('Error sending HMR update:', e);
-                }
+            if (!hmr) return;
+
+            // Simplified HMR logic for CSS
+            Object.keys(result.metafile.outputs).forEach(outputFile => {
+              if (outputFile.endsWith('.css')) {
+                // Extract the original source file name if possible, or use output name
+                const sourceFileName = P.basename(outputFile); // Simple basename
+                hmr.notifyClients('css', sourceFileName);
               }
-            }
-            console.log('[DEBUG SCSS onEnd] No errors, proceeding with HMR notify.'); // <-- Add Log
+            });
           });
         }
       }

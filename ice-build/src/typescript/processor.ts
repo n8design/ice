@@ -6,11 +6,12 @@ import { BuildContext } from '../types.js';
 import { resolvePathAliases } from './path-alias-plugin.js';
 import { reportError } from '../utils/index.js';
 import * as fs from 'fs';
-import { normalizePath } from '../utils/path-utils.js'; // <--- Import normalizePath
+import { normalizePath } from '../utils/path-utils.js';
+import ts from 'typescript'; // <--- Import ts
 
 export async function setupTsProcessor(
   ctx: BuildContext,
-  hmr: HotReloadServer | null, // Allow null hmr
+  hmr: HotReloadServer | null,
   tsFilesCount: { value: number }
 ): Promise<esbuild.BuildContext> {
 
@@ -32,12 +33,19 @@ export async function setupTsProcessor(
 
   // Ensure outbase and outdir are absolute and normalized
   const outbase = normalizePath(P.resolve(ctx.projectDir, ctx.sourceDir));
-  // --->>> CHANGE THIS LINE <<<---
-  const outdir = normalizePath(P.resolve(ctx.projectDir, ctx.outputDir, 'dist')); // Add 'dist'
-  const target = ctx.tsConfig?.options?.target as string || 'es2020';
+  const outdir = normalizePath(P.resolve(ctx.projectDir, ctx.outputDir, 'dist'));
 
-  console.log(`[TS Processor] esbuild outDir: ${outdir}`); // Log absolute paths
-  console.log(`[TS Processor] esbuild outBase: ${outbase}`); // Log absolute paths
+  // --->>> FIX TARGET CONVERSION <<<---
+  // Get the enum value, default to ES2020 if undefined
+  const targetEnum = ctx.tsConfig?.options?.target ?? ts.ScriptTarget.ES2020;
+  // Convert the enum value to its string name (e.g., 'ES2020')
+  const targetString = ts.ScriptTarget[targetEnum];
+  // Ensure it's lowercase for esbuild (e.g., 'es2020')
+  const target = targetString.toLowerCase();
+
+  console.log(`[TS Processor] esbuild outDir: ${outdir}`);
+  console.log(`[TS Processor] esbuild outBase: ${outbase}`);
+  console.log(`[TS Processor] esbuild target: ${target}`); // Log the final target string
 
   const plugins: esbuild.Plugin[] = [];
 
@@ -108,7 +116,7 @@ export async function setupTsProcessor(
     bundle: true,             // <--- SET BUNDLE TO TRUE
     format: 'esm',
     platform: 'browser',
-    target: target,
+    target: target, // Use the converted target string
     sourcemap: 'external',
     logLevel: ctx.isVerbose ? 'info' : 'warning',
     write: true,
