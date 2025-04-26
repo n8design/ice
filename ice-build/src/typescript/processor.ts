@@ -31,9 +31,10 @@ export async function setupTsProcessor(
   }
 
   // Ensure outbase and outdir are absolute and normalized
-  const outbase = normalizePath(P.resolve(ctx.projectDir, ctx.sourceDir)); // Use resolve for absolute
-  const outdir = normalizePath(P.resolve(ctx.projectDir, ctx.outputDir)); // Use resolve for absolute
-  const target = ctx.tsConfig?.options?.target as string || 'es2020'; // Assuming options exists
+  const outbase = normalizePath(P.resolve(ctx.projectDir, ctx.sourceDir));
+  // --->>> CHANGE THIS LINE <<<---
+  const outdir = normalizePath(P.resolve(ctx.projectDir, ctx.outputDir, 'dist')); // Add 'dist'
+  const target = ctx.tsConfig?.options?.target as string || 'es2020';
 
   console.log(`[TS Processor] esbuild outDir: ${outdir}`); // Log absolute paths
   console.log(`[TS Processor] esbuild outBase: ${outbase}`); // Log absolute paths
@@ -67,8 +68,9 @@ export async function setupTsProcessor(
         console.log(`[DEBUG TS onEnd] Warnings reported by esbuild: ${result.warnings.length}`); // Log warnings
 
         // --->>> REINSTATE METAFILE LOGGING <<<---
-        const outputCount = result.metafile ? Object.keys(result.metafile.outputs).length : 0;
-        console.log(`[DEBUG TS onEnd] Metafile output count: ${outputCount}`);
+        const outputCount = result.metafile ? Object.keys(result.metafile.outputs).filter(f => f.endsWith('.js')).length : 0; // Count only .js outputs
+        console.log(`[DEBUG TS onEnd] Metafile JS output count: ${outputCount}`);
+        tsFilesCount.value = outputCount; // Update count based on metafile
 
         if (!hmr) return;
 
@@ -78,7 +80,6 @@ export async function setupTsProcessor(
           reportError('TypeScript build', errorMessages, ctx.isVerbose);
         } else {
           console.log('[DEBUG TS onEnd] No errors, proceeding with HMR notify.');
-          tsFilesCount.value = outputCount; // Update count based on metafile
           hmr.notifyClients('full', ''); // Assuming 'full' reload is desired
         }
       });
@@ -101,9 +102,9 @@ export async function setupTsProcessor(
 
   // --- esbuild Context ---
   return esbuild.context({
-    entryPoints: entryPoints, // Use absolute, normalized entry points
-    outdir: outdir,           // Use absolute, normalized outdir
-    outbase: outbase,         // Use absolute, normalized outbase
+    entryPoints: entryPoints,
+    outdir: outdir,           // Use updated outdir
+    outbase: outbase,
     bundle: true,             // <--- SET BUNDLE TO TRUE
     format: 'esm',
     platform: 'browser',

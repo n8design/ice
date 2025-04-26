@@ -15,21 +15,22 @@ export async function setupScssProcessor(
   hmr: HotReloadServer,
   scssFilesCount: { value: number }
 ): Promise<esbuild.BuildContext> {
-  const globPattern = `${ctx.sourceDir}/**/*.scss`;
-  const entryPoints = (await glob(globPattern, { cwd: ctx.projectDir }))
-    .filter(file => {
-      const fullPath = P.join(ctx.projectDir, file);
-      return fs.statSync(fullPath).isFile() && !P.basename(file).startsWith('_');
-    });
 
-  if (ctx.isVerbose) {
-    console.log(`[SCSS] Found ${entryPoints.length} entry points`);
-  }
+  // ... (glob logic remains the same) ...
+
+  // Ensure outbase and outdir are absolute and normalized
+  const outbase = normalizePath(P.resolve(ctx.projectDir, ctx.sourceDir));
+  // --->>> CHANGE THIS LINE <<<---
+  const outdir = normalizePath(P.resolve(ctx.projectDir, ctx.outputDir, 'dist')); // Add 'dist'
+
+  console.log(`[SCSS Processor] esbuild outDir: ${outdir}`); // Log absolute paths
+  console.log(`[SCSS Processor] esbuild outBase: ${outbase}`); // Log absolute paths
+
 
   return esbuild.context({
-    entryPoints: entryPoints,
-    outdir: P.join(ctx.projectDir, ctx.outputDir),
-    outbase: P.join(ctx.projectDir, ctx.sourceDir),
+    entryPoints: entryPoints.map(normalizePath), // Ensure entry points are normalized here too
+    outdir: outdir,           // Use updated outdir
+    outbase: outbase,
     bundle: true,
     logLevel: ctx.isVerbose ? 'info' : 'warning',
     sourcemap: 'external',
