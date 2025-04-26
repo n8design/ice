@@ -85,6 +85,20 @@ export async function setupTsProcessor(
     }
   });
 
+  plugins.push({
+    name: 'ignore-scss-imports',
+    setup(build: esbuild.PluginBuild) {
+      // Mark .scss files as external so esbuild doesn't try to bundle them here
+      build.onResolve({ filter: /\.scss$/ }, args => {
+        if (ctx.isVerbose) {
+          console.log(`[TS Processor] Ignoring SCSS import: ${args.path}`);
+        }
+        // Resolve the path relative to the importer, but mark as external
+        return { path: args.path, external: true, namespace: 'ignore-scss' };
+      });
+    }
+  });
+
   // --- esbuild Context ---
   return esbuild.context({
     entryPoints: entryPoints, // Use absolute, normalized entry points
