@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 console.log('DOM fully loaded and parsed');
+console.log('Debugging information:');
 // let testVar: number = "this is definitely not a number";
 
 // consoel.debug('Debugging information:');

@@ -2,22 +2,13 @@ import * as esbuild from 'esbuild';
 import * as path from 'path';
 import { statSync } from 'fs';
 
-// Properly type tsConfig to avoid errors
-interface TsConfig {
-  compilerOptions?: {
-    paths?: Record<string, string[]>;
-    baseUrl?: string;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
-
-export function resolvePathAliases(tsConfig: TsConfig, projectDir: string): esbuild.Plugin {
-  // Extract path aliases from tsconfig - now properly typed
-  const paths = tsConfig.compilerOptions?.paths || {};
-  const baseUrl = tsConfig.compilerOptions?.baseUrl || '.';
-  
-  if (Object.keys(paths).length === 0) {
+// Update function signature to match how it's called in processor.ts
+export function resolvePathAliases(
+  projectDir: string,
+  outbase: string,
+  paths: Record<string, string[]>
+): esbuild.Plugin {
+  if (!paths || Object.keys(paths).length === 0) {
     return {
       name: 'no-path-aliases',
       setup() {} // Empty plugin if no aliases
@@ -43,9 +34,9 @@ export function resolvePathAliases(tsConfig: TsConfig, projectDir: string): esbu
             const wildcard = match[1] || '';
             
             // Try each target path
-            for (const target of targets) { // No need for "as string[]"
+            for (const target of targets) {
               const resolvedTarget = target.replace(/\*/g, wildcard);
-              const fullPath = path.join(projectDir, baseUrl, resolvedTarget);
+              const fullPath = path.join(projectDir, resolvedTarget);
               
               try {
                 const stats = statSync(fullPath);

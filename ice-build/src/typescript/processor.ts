@@ -1,126 +1,144 @@
-import * as esbuild from 'esbuild';
-import * as P from 'path';
-import { glob } from 'glob';
-import { HotReloadServer } from '@n8d/ice-hotreloader';
-import { BuildContext } from '../types.js';
-import { resolvePathAliases } from './path-alias-plugin.js';
-import { reportError } from '../utils/index.js';
+import * as path from 'path';
 import * as fs from 'fs';
-import { normalizePath } from '../utils/path-utils.js';
-import ts from 'typescript'; // <--- Import ts
+import { glob } from 'glob';
+import * as esbuild from 'esbuild';
+import * as ts from 'typescript';
+import { performance } from 'perf_hooks';
+import { HotReloadServer } from '@n8d/ice-hotreloader';
+import { reportError } from '../utils/index.js';
+import { formatBuildError } from '../utils/error-formatter.js';
+import { getCurrentTime, formatDuration } from '../utils/console.js';
+import { BuildContext } from '../types.js';
+import { normalizePath, P, resolvePathAliases } from '../utils/path-utils.js';
+
+// Helper function to check if a file is a TypeScript declaration file
+function isTypeDefinitionFile(file: string): boolean {
+  return file.endsWith('.d.ts');
+}
 
 export async function setupTsProcessor(
   ctx: BuildContext,
   hmr: HotReloadServer | null,
   tsFilesCount: { value: number }
 ): Promise<esbuild.BuildContext> {
+  const { projectDir, sourceDir, outputDir, config, tsConfig, isVerbose } = ctx;
 
-  // Use absolute paths for glob and normalize them
-  const globPattern = normalizePath(P.join(ctx.projectDir, ctx.sourceDir, '**/*.{ts,tsx}'));
-  console.log(`[TS Processor] Glob pattern: ${globPattern}`); // Keep this log
+  try {
+    // Find all TS files in the source directory
+    const globPattern = `${sourceDir}/**/*.{ts,tsx}`;
+    const tsFiles = await glob(globPattern, { 
+      cwd: projectDir, 
+      ignore: ['**/node_modules/**', '**/*.d.ts'] 
+    });
 
-  const entryPoints = (await glob(globPattern, {
-      ignore: ['node_modules/**', '**/*.d.ts'],
-      absolute: true, // <--- Use absolute paths
-      nodir: true,
-    }))
-    .map(normalizePath); // <--- Normalize results
+    // Prepare entry points for compilation
+    const entryPoints: Record<string, string> = {};
+    
+    // Filter out and count TypeScript files
+    const filteredTsFiles = tsFiles
+      .filter(file => !isTypeDefinitionFile(file))
+      .map(file => normalizePath(path.join(P.normalize(projectDir), file)));
 
-  console.log(`[TS Processor] Found absolute entry points: ${JSON.stringify(entryPoints)}`);
-  if (entryPoints.length === 0) {
-      console.warn(`[TS Processor] Warning: No TS entry points found matching pattern.`);
-  }
+    tsFilesCount.value = filteredTsFiles.length;
 
-  // Ensure outbase and outdir are absolute and normalized
-  const outbase = normalizePath(P.resolve(ctx.projectDir, ctx.sourceDir));
-  const outdir = normalizePath(P.resolve(ctx.projectDir, ctx.outputDir, 'dist'));
+    if (filteredTsFiles.length === 0) {
+      console.log('No TypeScript files found to process');
+      return {} as esbuild.BuildContext; // Just to satisfy TypeScript
+    }
 
-  // --->>> FIX TARGET CONVERSION <<<---
-  // Get the enum value, default to ES2020 if undefined
-  const targetEnum = ctx.tsConfig?.options?.target ?? ts.ScriptTarget.ES2020;
-  // Convert the enum value to its string name (e.g., 'ES2020')
-  const targetString = ts.ScriptTarget[targetEnum];
-  // Ensure it's lowercase for esbuild (e.g., 'es2020')
-  const target = targetString.toLowerCase();
+    // Create entry points mapping
+    for (const filePath of filteredTsFiles) {
+      const relativePath = path.relative(path.join(projectDir, sourceDir), filePath);
+      // Handle .ts and .tsx files
+      const outputPath = relativePath.replace(/\.tsx?$/, '.js');
+      entryPoints[outputPath] = filePath;
 
-  console.log(`[TS Processor] esbuild outDir: ${outdir}`);
-  console.log(`[TS Processor] esbuild outBase: ${outbase}`);
-  console.log(`[TS Processor] esbuild target: ${target}`); // Log the final target string
-
-  const plugins: esbuild.Plugin[] = [];
-
-  // Path Alias Plugin Handling
-  if (ctx.tsConfig?.options?.paths) { // Assuming options exists
-    try {
-      const pathAliasPlugin = resolvePathAliases(
-        ctx.projectDir, // Pass projectDir (used for resolving paths)
-        outbase, // Pass absolute outbase (sourceDir)
-        ctx.tsConfig.options.paths // Assuming options exists
-      );
-      plugins.push(pathAliasPlugin);
-      if (ctx.isVerbose) {
-        console.log("[TS] Path alias plugin enabled");
+      if (isVerbose) {
+        console.log(`Processing TS: ${relativePath}`);
       }
-    } catch (error) {
-      reportError('Path alias plugin', error as Error, ctx.isVerbose);
     }
+
+    // Extract path aliases from tsconfig if available
+    const aliases = tsConfig?.options.paths 
+      ? resolvePathAliases('', '', tsConfig?.options.paths as Record<string, string[]>) 
+      : {};
+
+    // Set up esbuild plugin for TypeScript
+    const tsPlugin = {
+      name: 'typescript',
+      setup(build: esbuild.PluginBuild) {
+        // Track build start time
+        let buildStartTime = 0;
+        
+        build.onStart(() => {
+          buildStartTime = performance.now();
+        });
+        
+        // Notify HMR on build completion
+        build.onEnd(async (result: esbuild.BuildResult) => {
+          if (!hmr) return;
+          
+          // Calculate build duration
+          const buildDuration = performance.now() - buildStartTime;
+          const formattedTime = buildDuration.toFixed(2);
+
+          if (result.errors.length > 0) {
+            if (ctx.isVerbose) {
+              console.log('[DEBUG TS onEnd] Calling reportError...');
+            }
+            
+            // Process each error with better formatting
+            result.errors.forEach(error => {
+              // Create a more informative error message that includes the filename
+              const errorMessage = error.location 
+                ? `${error.location.file}:${error.location.line}:${error.location.column}: ${error.text}`
+                : error.text;
+                
+              const errorObj = new Error(errorMessage);
+              
+              // Report each error with nice formatting
+              reportError('TypeScript build', errorObj, ctx.projectDir);
+            });
+          } else {
+            if (ctx.isVerbose) {
+              console.log('[DEBUG TS onEnd] No errors, proceeding with HMR notify.');
+            }
+            
+            console.log(`🧊 [${getCurrentTime()}] TypeScript build completed in ${formattedTime}ms`);
+            hmr.notifyClients('full', '');
+          }
+        });
+      }
+    };
+
+    // Get include paths from tsconfig or defaults
+    const includePaths = tsConfig?.options.paths 
+      ? Object.values(tsConfig.options.paths).flat() as string[]
+      : [];
+
+    // Set up esbuild context
+    return await esbuild.context({
+      entryPoints,
+      outdir: path.join(projectDir, outputDir),
+      bundle: false,
+      platform: 'browser',
+      format: tsConfig?.options.module === ts.ModuleKind.CommonJS ? 'cjs' : 'esm',
+      sourcemap: true,
+      target: 'es2018',
+      jsx: tsConfig?.options.jsx === ts.JsxEmit.Preserve ? 'preserve' : 'transform', 
+      jsxFactory: tsConfig?.options.jsxFactory || 'React.createElement',
+      jsxFragment: tsConfig?.options.jsxFragmentFactory || 'React.Fragment',
+      // Handle CSS imports in TypeScript
+      loader: {
+        '.css': 'file',
+        '.scss': 'file',
+        '.sass': 'file'
+      },
+      plugins: [tsPlugin],
+      ...config.typescriptOptions
+    });
+  } catch (err) {
+    reportError('Failed to set up TypeScript processor', err as Error);
+    throw err;
   }
-
-  // --- HMR Notify Plugin ---
-  plugins.push({
-    name: 'ts-hmr-notify',
-    setup(build: esbuild.PluginBuild) { // Add type
-      build.onEnd((result: esbuild.BuildResult) => { // Add type
-        console.log('[DEBUG TS onEnd] Triggered.');
-        console.log(`[DEBUG TS onEnd] Errors reported by esbuild: ${result.errors.length}`);
-        console.log(`[DEBUG TS onEnd] Warnings reported by esbuild: ${result.warnings.length}`); // Log warnings
-
-        // --->>> REINSTATE METAFILE LOGGING <<<---
-        const outputCount = result.metafile ? Object.keys(result.metafile.outputs).filter(f => f.endsWith('.js')).length : 0; // Count only .js outputs
-        console.log(`[DEBUG TS onEnd] Metafile JS output count: ${outputCount}`);
-        tsFilesCount.value = outputCount; // Update count based on metafile
-
-        if (!hmr) return;
-
-        if (result.errors.length > 0) {
-          console.log('[DEBUG TS onEnd] Calling reportError...');
-          const errorMessages = result.errors.map((e: esbuild.Message) => e.text).join('\n'); // Add type
-          reportError('TypeScript build', errorMessages, ctx.isVerbose);
-        } else {
-          console.log('[DEBUG TS onEnd] No errors, proceeding with HMR notify.');
-          hmr.notifyClients('full', ''); // Assuming 'full' reload is desired
-        }
-      });
-    }
-  });
-
-  plugins.push({
-    name: 'ignore-scss-imports',
-    setup(build: esbuild.PluginBuild) {
-      // Mark .scss files as external so esbuild doesn't try to bundle them here
-      build.onResolve({ filter: /\.scss$/ }, args => {
-        if (ctx.isVerbose) {
-          console.log(`[TS Processor] Ignoring SCSS import: ${args.path}`);
-        }
-        // Resolve the path relative to the importer, but mark as external
-        return { path: args.path, external: true, namespace: 'ignore-scss' };
-      });
-    }
-  });
-
-  // --- esbuild Context ---
-  return esbuild.context({
-    entryPoints: entryPoints,
-    outdir: outdir,           // Use updated outdir
-    outbase: outbase,
-    bundle: true,             // <--- SET BUNDLE TO TRUE
-    format: 'esm',
-    platform: 'browser',
-    target: target, // Use the converted target string
-    sourcemap: 'external',
-    logLevel: ctx.isVerbose ? 'info' : 'warning',
-    write: true,
-    metafile: true,
-    plugins: plugins,
-  });
 }

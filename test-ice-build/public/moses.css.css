@@ -1,0 +1,11 @@
+.mose {
+  content: "was a good man";
+  color: yellow;
+  background-color: lime;
+}
+@media screen {
+  .mose .content {
+    content: "hello world";
+  }
+}
+/*# sourceMappingURL=moses.css.css.map */

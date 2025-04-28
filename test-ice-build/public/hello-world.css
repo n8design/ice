@@ -1,19 +1,27 @@
-/* source/hello-world.scss */
 .cotnent2 {
   content: "ajsldk alsdk ";
 }
+
 .hell {
   content: "oworld";
   background-color: pink;
-  color: yellow;
 }
+
 .a-maker-bot {
   content: "a new maker bot is in town";
 }
-.another {
-  content: "Brick in the wall";
-  background-col: lime;
+@media screen {
+  .a-maker-bot .content {
+    content: "hello world";
+  }
 }
+
+.another {
+  contnt: "Brick in the";
+  background-color: lime;
+}
+
 .content {
   content: "Just another content";
+  background-color: pink;
 }

@@ -5,18 +5,34 @@ import { performance } from 'perf_hooks';
 import { parseArgs } from 'node:util';
 import * as esbuild from 'esbuild';
 import { HotReloadServer } from '@n8d/ice-hotreloader';
-// Add .js extensions
-import { setupScssProcessor } from './scss/index.js';
-import { setupTsProcessor } from './typescript/index.js';
-import { loadProjectConfig, loadTsConfig, detectSourceDirectory } from './config/index.js';
-import { reportError } from './utils/index.js';
-import { BuildContext, IceBuildConfig } from './types.js';
 import * as chokidar from 'chokidar';
-import * as url from 'url'; // Keep this import for pathToFileURL if used later
+import * as url from 'url';
+
+// Import processors and utilities
+import { setupDirectSassProcessor } from './scss/direct-processor.js';
+import { setupTsProcessor } from './typescript/processor.js';
+import { handlePartialChange } from './scss/partials.js';
+import { createHmrServer, formatHmrMessage } from './hmr/index.js';
+import { loadProjectConfig, loadTsConfig, detectSourceDirectory } from './config/index.js';
+import { 
+  logInfo, logSuccess, logError, logFileCompilation, formatSuccess, 
+  getCurrentTime, formatDuration, logHotReload, logHotReloadDetail, 
+  logHotReloadSuccess, logHotReloadError 
+} from './utils/console.js';
+import { reportError } from './utils/index.js';
+import { cleanupCssJsFiles } from './utils/cleanup.js';
+import { BuildContext, IceBuildConfig } from './types.js';
+
+// Hipster-style ASCII art logo
+const LOGO = `
+${"\x1b[35m"}🧊 ICE BUILD${"\x1b[0m"}
+${"\x1b[36m"}Artisanally crafted build tool${"\x1b[0m"}
+`;
 
 export async function startBuild(): Promise<void> {
   const startTime = performance.now();
-  console.log('Starting ice-build...');
+  console.log(LOGO);
+  logInfo('Starting build process...');
 
   // --- Argument Parsing ---
   const options = {
@@ -32,7 +48,7 @@ export async function startBuild(): Promise<void> {
   try {
     args = parseArgs({ options, allowPositionals: true });
   } catch (e) {
-    console.error(`Error parsing arguments: ${(e as Error).message}`);
+    logError(`Error parsing arguments: ${(e as Error).message}`);
     printHelp();
     process.exit(1);
   }
@@ -55,11 +71,11 @@ export async function startBuild(): Promise<void> {
   const loadedConfig: IceBuildConfig | undefined = await loadProjectConfig(projectDir);
 
   if (!loadedConfig) {
-    console.error("Failed to load project configuration...");
+    logError("Failed to load project configuration...");
     process.exit(1);
   }
 
-  const config: IceBuildConfig = loadedConfig; // config is guaranteed IceBuildConfig here
+  const config: IceBuildConfig = loadedConfig;
 
   // Override config with CLI args
   config.outputDir = args.values['output-dir'] || config.outputDir;
@@ -67,25 +83,24 @@ export async function startBuild(): Promise<void> {
   config.port = args.values.port ? parseInt(args.values.port, 10) : config.port;
 
   // Detect source directory *before* final config adjustments if needed
-  // Pass the whole config object
   const detectedSourceDir = await detectSourceDirectory(projectDir, config);
-  config.sourceDir = detectedSourceDir; // Assign the detected path back
+  config.sourceDir = detectedSourceDir;
 
   const outputDir = config.outputDir || 'public';
   const port = config.port || 3001;
 
   // Load tsConfig *after* all config values are finalized
-  const tsConfig = await loadTsConfig(projectDir, config); // Pass the final config object
+  const tsConfig = await loadTsConfig(projectDir, config);
 
-  // Ensure sourceDir is defined before creating context (detectSourceDirectory should handle this)
+  // Ensure sourceDir is defined before creating context
   if (!config.sourceDir) {
-    console.error("❌ Error: Source directory could not be determined.");
+    logError("❌ Error: Source directory could not be determined.");
     process.exit(1);
   }
 
   const ctx: BuildContext = {
     projectDir,
-    sourceDir: config.sourceDir, // Use the validated sourceDir
+    sourceDir: config.sourceDir,
     outputDir,
     config,
     tsConfig,
@@ -93,94 +108,161 @@ export async function startBuild(): Promise<void> {
     isVerbose,
   };
 
-  console.log(`Source directory: ${ctx.sourceDir}`);
-  console.log(`Output directory: ${outputDir}`);
-  if (watchMode) console.log(`Watch mode enabled. HMR port: ${port}`);
+  logInfo(`Source directory: ${ctx.sourceDir}`);
+  logInfo(`Output directory: ${outputDir}`);
+  if (watchMode) logInfo(`Watch mode enabled. HMR port: ${port}`);
 
   // --- Hot Reload Server ---
   let hmr: HotReloadServer | null = null;
   if (watchMode) {
     try {
-      hmr = new HotReloadServer(port);
+      // Only pass the port parameter
+      hmr = createHmrServer(port);
+      logHotReload("Ready for changes");
     } catch (error) {
-      reportError('HMR Server failed to start', error as Error, isVerbose);
+      logHotReloadError('Server failed to start', error as Error, isVerbose);
       process.exit(1);
     }
   }
 
   // --- Build Setup ---
-  let scssContext: esbuild.BuildContext | null = null;
+  let scssProcessor: { rebuild: () => Promise<void>; dispose: () => Promise<void>; watch: () => void } | null = null;
   let tsContext: esbuild.BuildContext | null = null;
   const scssFilesCount = { value: 0 };
   const tsFilesCount = { value: 0 };
 
   try {
-    // Use non-null assertion carefully, assuming hmr is needed by processors in watch mode
-    scssContext = await setupScssProcessor(ctx, hmr!, scssFilesCount);
-    tsContext = await setupTsProcessor(ctx, hmr!, tsFilesCount);
+    // Use our new direct SCSS processor instead of the esbuild-based one
+    scssProcessor = await setupDirectSassProcessor(ctx, hmr, scssFilesCount);
+    tsContext = await setupTsProcessor(ctx, hmr, tsFilesCount);
 
     // --- Build Execution ---
     if (watchMode) {
-      // Initial build and start esbuild's watch mode (this handles changes to existing files)
-      console.log('Initial build starting...');
-      await Promise.all([
-        scssContext?.rebuild() ?? Promise.resolve(), // Use ?.
-        tsContext?.rebuild() ?? Promise.resolve()   // Use ?.
-      ]);
-      console.log('Initial build complete. Watching for changes...');
+      // Initial build and start watch mode
+      logInfo('Initial build starting...');
+      const initialBuildStart = performance.now();
       
-      // Start esbuild watching (for changes to EXISTING files)
-      scssContext?.watch(); // Use ?.
-      tsContext?.watch();   // Use ?.
+      // Avoid duplicate processing by clearing any previous CSS.js files
+      await cleanupCssJsFiles(path.join(ctx.projectDir, ctx.outputDir));
+      
+      // Process all files in one go
+      await Promise.all([
+        scssProcessor?.rebuild() ?? Promise.resolve(),
+        tsContext?.rebuild() ?? Promise.resolve()
+      ]);
+      
+      // Start watching
+      scssProcessor?.watch();
+      tsContext?.watch();
+      
+      const initialBuildEnd = performance.now();
+      const initialBuildDuration = formatDuration(initialBuildEnd - initialBuildStart);
+      
+      logSuccess(`Initial build complete in ${initialBuildDuration}. Watching for changes...`);
       
       // Add directory watcher to detect NEW files
       const watcher = chokidar.watch(
         path.join(ctx.projectDir, ctx.sourceDir), 
         {
           ignoreInitial: true,
-          awaitWriteFinish: true
+          awaitWriteFinish: true,
+          ignored: [
+            '**/node_modules/**',
+            '**/dist/**',
+            '**/build/**',
+            '**/public/**',
+          ]
         }
       );
       
-      // When new files are added that match our patterns
+      // When new files are added or changed
       watcher.on('add', async (filePath) => {
         const relativePath = path.relative(ctx.projectDir, filePath);
         
-        if (filePath.endsWith('.scss')) {
-          // Only rebuild for non-partial SCSS files (don't start with _)
-          if (!path.basename(filePath).startsWith('_')) {
-            console.log('Rebuilding SCSS context with new entry points...');
+        if (filePath.endsWith('.scss') || filePath.endsWith('.sass')) {
+          if (path.basename(filePath).startsWith('_')) {
+            // If it's a partial SCSS file, find and rebuild the dependent files
+            logFileCompilation('SCSS Partial', relativePath);
+            await handlePartialChange(ctx, hmr, filePath);
+          } else {
+            // For non-partial files, rebuild the entire SCSS context
+            logFileCompilation('SCSS', relativePath);
             // Dispose old context and create a new one
-            await scssContext?.dispose(); // Use ?.
-            scssContext = await setupScssProcessor(ctx, hmr!, scssFilesCount);
-            await scssContext?.rebuild(); // Add null check here
-            scssContext?.watch();
+            if (isVerbose) {
+              logHotReloadDetail(`Rebuilding SCSS: ${relativePath}`, isVerbose);
+            }
+            await scssProcessor?.dispose();
+            scssProcessor = await setupDirectSassProcessor(ctx, hmr, scssFilesCount);
+            await scssProcessor?.rebuild();
+            scssProcessor?.watch();
+            if (!isVerbose) {
+              logHotReloadSuccess(`Updated ${path.basename(filePath)}`);
+            }
           }
-        } else if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) { // Ensure .tsx is handled
-          console.log('Rebuilding TypeScript context with new entry points...');
-          // Dispose old context and create a new one
-          await tsContext?.dispose(); // Use ?.
-          tsContext = await setupTsProcessor(ctx, hmr!, tsFilesCount);
-          await tsContext?.rebuild(); // Add null check here
+        } else if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
+          logFileCompilation(filePath.endsWith('.tsx') ? 'TSX' : 'TypeScript', relativePath);
+          // Rebuild TypeScript context with new entry point
+          if (isVerbose) {
+            logHotReloadDetail(`Rebuilding TypeScript: ${relativePath}`, isVerbose);
+          }
+          await tsContext?.dispose();
+          tsContext = await setupTsProcessor(ctx, hmr, tsFilesCount);
+          await tsContext?.rebuild();
           tsContext?.watch();
+          if (!isVerbose) {
+            logHotReloadSuccess(`Updated ${path.basename(filePath)}`);
+          }
         }
       });
       
-      console.log('Watching for file changes and new files... (Press Ctrl+C to stop)');
+      // When files are changed, handle SCSS partials specially
+      watcher.on('change', async (filePath) => {
+        if ((filePath.endsWith('.scss') || filePath.endsWith('.sass')) && 
+            path.basename(filePath).startsWith('_')) {
+          const relativePath = path.relative(ctx.projectDir, filePath);
+          logFileCompilation('SCSS Partial', relativePath);
+          if (isVerbose) {
+            logHotReloadDetail(`Processing changes to partial: ${relativePath}`, isVerbose);
+          }
+          await handlePartialChange(ctx, hmr, filePath);
+          if (!isVerbose) {
+            logHotReloadSuccess(`Updated styles from ${path.basename(filePath)}`);
+          }
+        }
+      });
+      
+      logInfo('Watching for file changes... (Press Ctrl+C to stop)');
+      if (isVerbose) {
+        logHotReloadDetail("Full details enabled in verbose mode", isVerbose);
+      } else {
+        logHotReload("Updates will be shown when files change");
+      }
+      
       await new Promise(() => {});
     } else {
       // Single build run
+      const singleBuildStart = performance.now();
+      
+      // Clean up before building
+      await cleanupCssJsFiles(path.join(ctx.projectDir, ctx.outputDir));
+      
       await Promise.all([
-        scssContext?.rebuild() ?? Promise.resolve(), // Use ?.
-        tsContext?.rebuild() ?? Promise.resolve()   // Use ?.
+        scssProcessor?.rebuild() ?? Promise.resolve(),
+        tsContext?.rebuild() ?? Promise.resolve()
       ]);
-      await scssContext?.dispose(); // Use ?.
-      await tsContext?.dispose();   // Use ?.
+      
+      await tsContext?.dispose();
+      await scssProcessor?.dispose();
+      
+      const singleBuildEnd = performance.now();
+      const singleBuildDuration = formatDuration(singleBuildEnd - singleBuildStart);
+      
+      logSuccess(`Build completed in ${singleBuildDuration}`);
     }
 
   } catch (error) {
-    reportError('Build setup or run failed', error as Error, isVerbose);
-    if (scssContext) await scssContext.dispose();
+    logError('Build setup or run failed', error as Error);
+    if (scssProcessor) await scssProcessor.dispose();
     if (tsContext) await tsContext.dispose();
     process.exit(1);
   }
@@ -188,13 +270,13 @@ export async function startBuild(): Promise<void> {
   // --- Watch Mode Handling & Shutdown ---
   if (watchMode) {
     const shutdown = async () => {
-      console.log('\nShutting down...');
+      logInfo('\nShutting down...');
       // Dispose contexts on shutdown
       await Promise.allSettled([
-        scssContext?.dispose() ?? Promise.resolve(), // Use ?.
-        tsContext?.dispose() ?? Promise.resolve(),   // Use ?.
+        scssProcessor?.dispose() ?? Promise.resolve(),
+        tsContext?.dispose() ?? Promise.resolve(),
       ]);
-      console.log('Build contexts disposed. HMR server stopped.');
+      logInfo('Build contexts disposed. HMR server stopped.');
       process.exit(0);
     };
     process.on('SIGINT', shutdown);
@@ -203,14 +285,15 @@ export async function startBuild(): Promise<void> {
   } else {
     const endTime = performance.now();
     const duration = endTime - startTime;
-    console.log(`✅ Build finished in ${duration.toFixed(2)}ms`);
-    console.log(`   Processed ${scssFilesCount.value} SCSS files.`);
-    console.log(`   Processed ${tsFilesCount.value} TypeScript files.`);
+    logSuccess(`Total process finished in ${formatDuration(duration)}`);
+    logInfo(`Processed ${scssFilesCount.value} SCSS files`);
+    logInfo(`Processed ${tsFilesCount.value} TypeScript files`);
   }
 }
 
 function printHelp() {
   console.log(`
+${LOGO}
 Usage: ice-build [options]
 
 Options:
@@ -221,5 +304,13 @@ Options:
   -v, --verbose       Enable verbose logging.
   -h, --help          Display this help message.
 `);
+}
+
+// Auto-start if this is the main module
+if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
+  startBuild().catch(err => {
+    logError('Unhandled error', err as Error);
+    process.exit(1);
+  });
 }
 

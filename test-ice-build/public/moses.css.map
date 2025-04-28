@@ -1,7 +1,1 @@
-{
-  "version": 3,
-  "sources": ["../moses.scss"],
-  "sourcesContent": [".mose{\n    content: \"was a good man\";\n    color: yellow;\n}"],
-  "mappings": ";AAAA,CAAA;AACI,WAAA;AACA,SAAA;;",
-  "names": []
-}
+{"version":3,"sources":["file:///Volumes/Code/n8design/projects/ice/test-ice-build/source/moses.scss","../source/moses.scss"],"names":[],"mappings":"AAAA;EACI,yBAAA;EACA,YAAA;EAEA,qBAAA;ACAJ;ADEI;EACI;IACI,sBAAA;ECAV;AACF","file":"moses.css"}

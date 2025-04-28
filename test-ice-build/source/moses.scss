@@ -1,4 +1,12 @@
 .mose{
     content: "was a good man";
-    color: yellow;
+    colo: yellow;
+
+    background-colo: lime;
+
+    @media screen {
+        .content{
+            content: "hello world";
+        }
+    }
 }

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../source/just-anither-file.scss"],
+  "sourcesContent": [".another {\n  content: \"Just another content\";\n}\n/*# sourceMappingURL=just-anither-file.css.map */"],
+  "mappings": "AAAA,CAAC;AACC,WAAS;AACX;",
+  "names": []
+}

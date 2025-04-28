@@ -12,9 +12,10 @@
     }
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=18.0.0"
   },
   "main": "./dist/ice-build.js",
+  "types": "./dist/types/ice-build.d.ts",
   "bin": {
     "ice-build": "./bin/cli.js"
   },
@@ -25,9 +26,9 @@
   ],
   "scripts": {
     "clean": "node -e \"if(require('fs').existsSync('dist')) require('fs').rmSync('dist', {recursive:true, force:true})\"",
-    "build:tsc": "tsc --outDir dist --declaration true",
-    "build:esbuild": "esbuild ./src/ice-build.ts --bundle --outfile=dist/ice-build.js --platform=node --format=esm --external:chokidar --external:glob --external:esbuild-sass-plugin --external:@n8d/ice-hotreloader --external:jiti --external:autoprefixer --external:postcss --external:browserslist --external:esbuild --external:eslint --external:typescript",
-    "build": "npm run clean && npm run build:esbuild",
+    "build:tsc": "tsc --outDir dist/types --declaration true --emitDeclarationOnly",
+    "build:esbuild": "esbuild ./src/ice-build.ts --bundle --outfile=dist/ice-build.js --platform=node --format=esm --external:chokidar --external:glob --external:esbuild-sass-plugin --external:@n8d/ice-hotreloader --external:jiti --external:autoprefixer --external:postcss --external:browserslist --external:esbuild --external:eslint --external:typescript --external:stylelint --external:stylelint-config-standard --external:sass",
+    "build": "npm run clean && npm run build:esbuild && npm run build:tsc",
     "watch": "node ./bin/cli.js --watch",
     "dev": "node ./bin/cli.js",
     "lint": "eslint .",
@@ -38,7 +39,10 @@
     "chokidar": "^3.5.3",
     "esbuild-sass-plugin": "^3.3.1",
     "fraction.js": "^4.3.7",
-    "glob": "^11.0.1"
+    "glob": "^11.0.1",
+    "chalk": "^5.3.0",
+    "postcss-scss": "^4.0.6",
+    "sass": "^1.68.0"
   },
   "peerDependencies": {
     "@eslint/config-array": "^0.20.0",
@@ -50,7 +54,9 @@
     "esbuild": "^0.20.0",
     "eslint": "^8.0.0 || ^9.0.0",
     "postcss": "^8.4.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "stylelint": ">=13.0.0",
+    "stylelint-config-standard": ">=20.0.0"
   },
   "peerDependenciesMeta": {
     "autoprefixer": {
@@ -75,6 +81,12 @@
       "optional": true
     },
     "typescript": {
+      "optional": true
+    },
+    "stylelint": {
+      "optional": true
+    },
+    "stylelint-config-standard": {
       "optional": true
     }
   },

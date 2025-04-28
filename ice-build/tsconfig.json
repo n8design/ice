@@ -1,18 +1,15 @@
 {
   "compilerOptions": {
-    "target": "ES2022", // Node 20 supports ES2022
-    "module": "NodeNext", // Use NodeNext for modern ESM
-    "moduleResolution": "NodeNext", // Enforces ESM rules like .js extensions
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
     "declaration": true,
-    "sourceMap": true,
-    "lib": ["ES2022", "DOM"] // Add DOM if browser types are needed anywhere
+    "outDir": "dist",
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "examples"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
