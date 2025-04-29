@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../source/styles.scss"],
-  "sourcesContent": [".content {\n  content: \"test\";\n}\n\nbody {\n  background-color: #f0f0f0;\n  font-family: sans-serif;\n}\nbody h1 {\n  text-decoration: underline;\n}\nbody h1 ::-moz-placeholder {\n  color: gray;\n}\nbody h1 ::placeholder {\n  color: gray;\n}\n/*# sourceMappingURL=styles.css.map */"],
-  "mappings": "AAAA,CAAC;AACC,WAAS;AACX;AAEA;AACE,oBAAkB;AAClB,eAAa;AACf;AACA,KAAK;AACH,mBAAiB;AACnB;AACA,KAAK,GAAG;AACN,SAAO;AACT;AACA,KAAK,GAAG;AACN,SAAO;AACT;",
-  "names": []
-}

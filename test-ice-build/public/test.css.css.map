@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../source/test.scss"],
-  "sourcesContent": ["body {\n  content: \"Is ok\";\n  background-color: lime;\n}\n/*# sourceMappingURL=test.css.map */"],
-  "mappings": "AAAA;AACE,WAAS;AACT,oBAAkB;AACpB;",
-  "names": []
-}

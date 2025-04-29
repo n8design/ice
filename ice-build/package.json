@@ -14,10 +14,9 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "main": "./dist/ice-build.js",
-  "types": "./dist/types/ice-build.d.ts",
+  "version": "0.0.4-alpha.55",
   "bin": {
-    "ice-build": "./bin/cli.js"
+    "ice-build": "./bin/ice-build.js"
   },
   "files": [
     "bin",
@@ -25,92 +24,33 @@
     "assets"
   ],
   "scripts": {
-    "clean": "node -e \"if(require('fs').existsSync('dist')) require('fs').rmSync('dist', {recursive:true, force:true})\"",
-    "build:tsc": "tsc --outDir dist/types --declaration true --emitDeclarationOnly",
-    "build:esbuild": "esbuild ./src/ice-build.ts --bundle --outfile=dist/ice-build.js --platform=node --format=esm --external:chokidar --external:glob --external:esbuild-sass-plugin --external:@n8d/ice-hotreloader --external:jiti --external:autoprefixer --external:postcss --external:browserslist --external:esbuild --external:eslint --external:typescript --external:stylelint --external:stylelint-config-standard --external:sass",
-    "build": "npm run clean && npm run build:esbuild && npm run build:tsc",
-    "watch": "node ./bin/cli.js --watch",
-    "dev": "node ./bin/cli.js",
-    "lint": "eslint .",
-    "test": "vitest run --coverage",
-    "test:integration": "bash ./test/integration/build-success.sh"
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rimraf dist",
+    "lint": "eslint src/**/*.ts",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "autoprefixer": "^10.4.14",
+    "chalk": "^5.2.0",
     "chokidar": "^3.5.3",
-    "esbuild-sass-plugin": "^3.3.1",
-    "fraction.js": "^4.3.7",
-    "glob": "^11.0.1",
-    "chalk": "^5.3.0",
-    "postcss-scss": "^4.0.6",
-    "sass": "^1.68.0"
-  },
-  "peerDependencies": {
-    "@eslint/config-array": "^0.20.0",
-    "@eslint/eslintrc": "^3.3.1",
-    "@eslint/js": "^9.25.0",
-    "@eslint/plugin-kit": "^0.2.8",
-    "@n8d/ice-hotreloader": "latest",
-    "autoprefixer": "^10.4.0",
-    "esbuild": "^0.20.0",
-    "eslint": "^8.0.0 || ^9.0.0",
-    "postcss": "^8.4.0",
-    "typescript": "^5.0.0",
-    "stylelint": ">=13.0.0",
-    "stylelint-config-standard": ">=20.0.0"
-  },
-  "peerDependenciesMeta": {
-    "autoprefixer": {
-      "optional": true
-    },
-    "eslint": {
-      "optional": true
-    },
-    "@eslint/config-array": {
-      "optional": true
-    },
-    "@eslint/eslintrc": {
-      "optional": true
-    },
-    "@eslint/js": {
-      "optional": true
-    },
-    "@eslint/plugin-kit": {
-      "optional": true
-    },
-    "postcss": {
-      "optional": true
-    },
-    "typescript": {
-      "optional": true
-    },
-    "stylelint": {
-      "optional": true
-    },
-    "stylelint-config-standard": {
-      "optional": true
-    }
+    "commander": "^10.0.1",
+    "esbuild": "^0.18.0",
+    "glob": "^10.2.6",
+    "lodash.debounce": "^4.0.8",
+    "postcss": "^8.4.24",
+    "sass": "^1.62.1",
+    "sass-graph": "^4.0.1",
+    "@n8d/ice-hotreloader": "file:../ice-hotreloader"
   },
   "devDependencies": {
-    "@eslint/config-array": "^0.20.0",
-    "@eslint/eslintrc": "^3.3.1",
-    "@eslint/js": "^9.25.0",
-    "@eslint/plugin-kit": "^0.2.8",
-    "@n8d/ice-hotreloader": "^0.0.1-alpha.14",
-    "@nx/eslint": "20.8.0",
-    "@types/eslint": "^9.6.1",
-    "@types/node": "^20.11.0",
-    "@typescript-eslint/eslint-plugin": "^8.30.1",
-    "@typescript-eslint/parser": "^8.30.1",
-    "@vitest/coverage-v8": "^3.1.2",
-    "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.2",
-    "eslint": "^9.25.0",
-    "eslint-config-prettier": "^10.1.2",
-    "nx": "20.8.0",
-    "postcss": "^8.5.3",
-    "tsx": "^4.19.3",
-    "typescript": "^5.4.5",
-    "vitest": "^3.1.2"
+    "@types/lodash.debounce": "^4.0.7",
+    "@types/node": "^18.16.16",
+    "@types/sass-graph": "^2.1.2",
+    "rimraf": "^5.0.1",
+    "typescript": "^5.0.4",
+    "vitest": "^0.31.1"
   },
   "repository": {
     "type": "git",
@@ -128,6 +68,5 @@
         "html"
       ]
     }
-  },
-  "version": "0.0.4-alpha.54"
+  }
 }

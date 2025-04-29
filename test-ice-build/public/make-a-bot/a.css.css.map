@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../source/make-a-bot/a.scss"],
-  "sourcesContent": ["a {\n  content: \"Bot\";\n}\n/*# sourceMappingURL=a.css.map */"],
-  "mappings": "AAAA;AACE,WAAS;AACX;",
-  "names": []
-}

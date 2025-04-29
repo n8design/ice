@@ -1,149 +1,85 @@
-import * as path from 'path';
-import * as fs from 'fs';
-import * as ts from 'typescript';
-import { IceBuildConfig } from '../types.js';
-import { logInfo, logWarning, logError } from '../utils/console.js';
+import { IceConfig } from '../types.js';
+import { defaultConfig } from './defaults.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { deepMerge } from '../utils/helpers.js';
+import { Logger } from '../utils/logger.js';
 
-// Default configuration
-const defaultConfig: IceBuildConfig = {
-  sourceDir: 'source', // Will be auto-detected
-  outputDir: 'public',
-  sassOptions: {
-    includePaths: ['node_modules'],
-  },
-  postcssPlugins: [], // Will be populated with autoprefixer by default
-  typescriptOptions: {
-    target: 'es2018',
-    format: 'esm',
-    sourcemap: true,
-  },
-  port: 3001,
-};
+const logger = new Logger('Config');
 
-// Load project configuration file
-export async function loadProjectConfig(projectDir: string): Promise<IceBuildConfig | undefined> {
-  // Potential configuration file paths
-  const configPaths = [
-    path.join(projectDir, 'ice-build.config.js'),
-    path.join(projectDir, 'ice-build.config.mjs'),
-    path.join(projectDir, 'ice-build.config.json'),
-    path.join(projectDir, '.ice-buildrc.js'),
-    path.join(projectDir, '.ice-buildrc.json'),
-  ];
-  
-  // Try to find an existing config file
-  let configPath: string | undefined;
-  for (const p of configPaths) {
-    if (fs.existsSync(p)) {
-      configPath = p;
-      break;
+export class ConfigManager {
+  private config: IceConfig;
+  private readonly cwd: string;
+
+  constructor(configPath?: string) {
+    this.cwd = process.cwd();
+    this.config = { ...defaultConfig };
+    
+    // If a specific config path is provided, use it
+    if (configPath) {
+      this.loadConfigFromPath(configPath);
+    } else {
+      this.loadUserConfig();
     }
   }
-  
-  let userConfig: Partial<IceBuildConfig> = {};
-  
-  if (configPath) {
+
+  private async loadUserConfig() {
+    // Look for ice.config.js or ice.config.mjs in the project root
+    const possiblePaths = [
+      path.join(this.cwd, 'ice.config.mjs'),
+      path.join(this.cwd, 'ice.config.js')
+    ];
+
+    for (const configPath of possiblePaths) {
+      if (fs.existsSync(configPath)) {
+        await this.loadConfigFromPath(configPath);
+        return;
+      }
+    }
+    
+    logger.info('No custom configuration found, using defaults');
+  }
+
+  private async loadConfigFromPath(configPath: string) {
     try {
-      logInfo(`Loading configuration from ${path.basename(configPath)}`);
+      const userConfigPath = path.isAbsolute(configPath) 
+        ? configPath 
+        : path.resolve(this.cwd, configPath);
       
-      if (configPath.endsWith('.json')) {
-        // Load JSON config
-        const content = fs.readFileSync(configPath, 'utf-8');
-        userConfig = JSON.parse(content);
-      } else {
-        // Load JS/ESM config - dynamic import works in both CommonJS and ESM
-        const configModule = await import(configPath);
-        userConfig = configModule.default || configModule;
+      logger.info(`Loading config from ${userConfigPath}`);
+      
+      if (!fs.existsSync(userConfigPath)) {
+        throw new Error(`Config file not found at ${userConfigPath}`);
       }
-    } catch (err) {
-      logError(`Failed to load configuration from ${configPath}`, err as Error);
-      // Continue with default config
-    }
-  } else {
-    logInfo('No configuration file found, using defaults');
-  }
-  
-  // Deep merge user config with defaults
-  return deepMerge(defaultConfig, userConfig);
-}
 
-// Detect source directory - try source/ or src/
-export async function detectSourceDirectory(projectDir: string, config: IceBuildConfig): Promise<string> {
-  // If already specified in config, use that
-  if (config.sourceDir && fs.existsSync(path.join(projectDir, config.sourceDir))) {
-    return config.sourceDir;
-  }
-  
-  // Try common directory names
-  const commonSourceDirs = ['source', 'src', 'app', 'assets'];
-  
-  for (const dir of commonSourceDirs) {
-    if (fs.existsSync(path.join(projectDir, dir))) {
-      logInfo(`Detected source directory: ${dir}/`);
-      return dir;
+      // Import the user config (works with ESM)
+      const userConfigModule = await import(userConfigPath);
+      
+      // Extract the default export or the config object
+      const userConfig = userConfigModule.default || userConfigModule;
+      
+      // Merge with defaults
+      this.config = deepMerge(defaultConfig, userConfig);
+      
+      logger.info('Custom configuration loaded and merged with defaults');
+    } catch (error: any) {
+      logger.error(`Failed to load configuration: ${error.message}`);
+      throw error;
     }
   }
-  
-  // Fall back to default
-  logWarning('Could not detect source directory, using "source" as default');
-  return 'source';
-}
 
-// Load TypeScript configuration from tsconfig.json
-export async function loadTsConfig(projectDir: string, config: IceBuildConfig): Promise<ts.ParsedCommandLine | undefined> {
-  // Check if the TypeScript compiler is available
-  try {
-    const tsConfigPath = path.join(projectDir, 'tsconfig.json');
-    
-    if (!fs.existsSync(tsConfigPath)) {
-      logInfo('No tsconfig.json found, using default TypeScript settings');
-      return undefined;
-    }
-    
-    // Parse tsconfig.json
-    const configFile = ts.readConfigFile(tsConfigPath, ts.sys.readFile);
-    if (configFile.error) {
-      logError(`Error reading tsconfig.json: ${configFile.error.messageText}`);
-      return undefined;
-    }
-    
-    // Parse and convert configs
-    const parsedConfig = ts.parseJsonConfigFileContent(
-      configFile.config,
-      ts.sys,
-      path.dirname(tsConfigPath)
-    );
-    
-    logInfo('TypeScript configuration loaded successfully');
-    return parsedConfig;
-  } catch (err) {
-    logError('Failed to load TypeScript configuration', err as Error);
-    return undefined;
+  public getConfig(): IceConfig {
+    return this.config;
   }
-}
 
-// Fixed deep merge function with better typing
-function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
-  const output = { ...target };
-  
-  if (source && typeof source === 'object' && !Array.isArray(source)) {
-    Object.keys(source).forEach(key => {
-      const sourceValue = source[key as keyof typeof source];
-      const targetValue = target[key as keyof typeof target];
-
-      if (sourceValue && typeof sourceValue === 'object' && !Array.isArray(sourceValue) &&
-          targetValue && typeof targetValue === 'object' && !Array.isArray(targetValue)) {
-        // Both are objects, recursively merge
-        output[key as keyof typeof output] = deepMerge(
-          targetValue,
-          sourceValue as any
-        ) as any;
-      } else {
-        // Either not both objects or one is null, just replace
-        output[key as keyof typeof output] = sourceValue as any;
-      }
-    });
+  // Helper to resolve paths relative to cwd
+  public resolvePath(relativePath: string): string {
+    return path.resolve(this.cwd, relativePath);
   }
-  
-  return output;
+
+  // Get resolved output path
+  public getOutputPath(): string {
+    return this.resolvePath(this.config.output.path);
+  }
 }

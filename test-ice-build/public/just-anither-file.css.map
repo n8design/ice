@@ -1,1 +1,1 @@
-{"version":3,"sources":["file:///Volumes/Code/n8design/projects/ice/test-ice-build/source/just-anither-file.scss","../source/just-anither-file.scss"],"names":[],"mappings":"AAAA;EACI,+BAAA;ACCJ","file":"just-anither-file.css"}
+{"version":3,"sources":["../source/just-anither-file.scss"],"names":[],"mappings":"AAAA;EACE,+BAA+B;AACjC","file":"just-anither-file.css","sourcesContent":[".another {\n  content: \"Just another content\";\n}"]}

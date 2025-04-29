@@ -1,17 +1,15 @@
-@use 'partial-test' as pt;
+// Import the partial
+@use './_make2';
 
-// filepath: test-ice-build/source/styles.scss
+// Main styles
 body {
-  background-color: #f0f0f0;
-  font-family: sans-serif;
-
+  font-family: Arial, sans-serif;
+  
   h1 {
-    // color: navy;
-    text-decoration: underline;
-    // Example for autoprefixer
-    ::placeholder {
-      color: gray;
-      // background-color: lime;
-    }
+    color: blue;
+  }
+  
+  p {
+    line-height: 1.6;
   }
 }

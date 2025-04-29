@@ -1,266 +1,228 @@
-# Ice Build Tool
+# Ice Build
 
-`@n8d/ice-build` is a command-line tool designed to simplify the build process for frontend projects. It integrates common tools like Sass, PostCSS (with Autoprefixer), esbuild (for JavaScript/TypeScript bundling), and ESLint.
+`@n8d/ice-build` is a lightweight, modern frontend build tool designed for TypeScript and SCSS projects with built-in hot reload support.
 
 ![hTWOo Iced Logo](https://raw.githubusercontent.com/n8design/ice/refs/heads/main/assets/frozen-htwoo.webp)
 
-## Features
+## Overview
 
-- **Sass/SCSS Compilation:** Compiles `.scss` files to `.css` with intelligent partial detection.
-- **PostCSS Integration:** Applies PostCSS plugins, including Autoprefixer by default.
-- **TypeScript Processing:** Compiles TypeScript files with full support for project-specific `tsconfig.json`.
-- **ESLint Integration:** Lints code during the build process with support for both flat and legacy ESLint configs.
-- **Smart Partial Handling:** When SCSS partials change, only recompiles files that import them.
-- **Optimized Output Structure:** TypeScript files in `source/ts/` are automatically placed in `public/js/`.
-- **Reliable File Watching:** Multi-layered file monitoring system that works across various file systems, including mounted volumes.
-- **Selective Rebuilds:** Only processes affected files when changes are detected.
-- **Hot Module Reloading:** Integrates with `@n8d/ice-hotreloader` for live updates without full page refreshes.
-- **Zero Configuration:** Works out-of-the-box with conventional project structures.
-- **Advanced Import Detection:** Accurately detects which files import SCSS partials by parsing content.
-- **Path Alias Support:** Resolves TypeScript path aliases defined in tsconfig.json.
-- **Performance Caching:** Skips writing unchanged files for faster builds.
-- **Custom Configuration:** Optional config file for advanced customization.
+Ice Build simplifies frontend development with a fast, efficient build system that includes:
+
+- TypeScript/TSX compilation with esbuild
+- SCSS compilation with Dart Sass
+- PostCSS processing with Autoprefixer
+- Smart dependency tracking for partial SCSS files
+- Hot Module Reloading via integration with ice-hotreloader
+- Live reload for instant CSS updates without page refreshes
 
 ## Installation
 
-Install the tool and its required peer dependencies in your project:
+Install the package and its peer dependencies:
 
 ```bash
 # Install ice-build and its required hot-reloader
 npm install --save-dev @n8d/ice-build @n8d/ice-hotreloader
 
-# Install other required peer dependencies (adjust versions as needed)
+# Install required peer dependencies
 npm install --save-dev esbuild sass postcss autoprefixer
 
-# Optional peer dependencies (if using linting or specific TS features)
-# npm install --save-dev eslint typescript
-```
-```bash
-# Using Yarn
-yarn add --dev @n8d/ice-build @n8d/ice-hotreloader
-yarn add --dev esbuild sass postcss autoprefixer
-# yarn add --dev eslint typescript # Optional
+# Optional peer dependencies for enhanced functionality
+npm install --save-dev eslint typescript
 ```
 
-**Required Peer Dependencies:**
+## Quick Start
 
-* `@n8d/ice-hotreloader`: Used for communication during watch mode.
-* `esbuild`: Core bundler.
-* `sass`: Required by `esbuild-sass-plugin` for SCSS compilation.
-* `postcss`: Required if PostCSS transformations (like autoprefixer) are used.
-* `autoprefixer`: Required if PostCSS transformations are used.
+### Basic Usage
 
-**Optional Peer Dependencies:**
+1. Create your project with the following structure:
+   ```
+   project/
+   ├── source/         # Source files
+   │   ├── index.ts    # TypeScript entry point
+   │   └── styles.scss # SCSS styles
+   ├── public/         # Output directory (created automatically)
+   └── package.json    # Project configuration
+   ```
 
-* `eslint`: If linting during the build is desired.
-* `typescript`: If advanced TypeScript features or configuration loading from the host project are needed.
+2. Add scripts to your `package.json`:
+   ```json
+   "scripts": {
+     "start": "ice-build --watch",
+     "build": "ice-build --clean",
+     "clean": "rimraf public/*.js public/*.css public/*.map"
+   }
+   ```
 
-## Usage
+3. Run development mode:
+   ```bash
+   npm start
+   ```
 
-Add scripts to your project's `package.json`:
+4. Build for production:
+   ```bash
+   npm run build
+   ```
 
-```json
-{
-  "scripts": {
-    "build": "ice-build",
-    "watch": "ice-build --watch",
-    "dev": "ice-build --watch --verbose"
-  }
-}
-```
+### Custom Configuration
 
-Then run the scripts:
+Create an `ice.config.js` file in your project root to customize the build:
 
-```bash
-# Run a single build
-npm run build
-
-# Run in watch mode
-npm run watch
-
-# Run with verbose output
-npm run dev
-```
-
-## Project Structure
-
-By default, `ice-build` works with the following directory structures:
-
-```
-your-project/
-├── public/               # Output directory (configurable)
-│   ├── css/              # CSS output
-│   ├── js/               # JavaScript/TypeScript output 
-├── source/ OR src/       # Source files (either name works)
-│   ├── css/              # SCSS/SASS files
-│   ├── styles/           # Alternative location for styles
-│   ├── ts/               # TypeScript files (outputs directly to js/)
-│   └── ...
-├── ice-build.config.js   # Optional configuration file
-├── tsconfig.json         # TypeScript configuration (optional)
-└── package.json
-```
-
-The tool automatically detects whether your project uses a `source/` or `src/` directory and adapts accordingly.
-
-## Custom Configuration
-
-Create an `ice-build.config.js` file in your project root for advanced configuration:
-
-```javascript
+```js
+// ice.config.js
 export default {
-  // Source directory (default: auto-detected 'source' or 'src')
-  sourceDir: 'source',
-  
-  // Output directory (default: 'public')
-  outputDir: 'public',
-  
-  // HMR server port (default: 3001)
-  port: 3001,
-  
-  // Sass options passed to esbuild-sass-plugin
-  sassOptions: {
-    includePaths: ['node_modules']
+  input: {
+    ts: ['source/**/*.ts', 'source/**/*.tsx'],
+    scss: ['source/**/*.scss']
   },
-  
-  // PostCSS plugins (default: [autoprefixer])
-  postcssPlugins: [
-    require('autoprefixer'),
-    require('cssnano')({ preset: 'default' })
-  ],
-  
-  // Override TypeScript options (merges with tsconfig.json if present)
-  typescriptOptions: {
-    target: "es2020",
-    module: "es2020"
+  output: {
+    path: 'public'
+  },
+  watch: {
+    paths: ['source'],
+    ignored: ['node_modules', '.git', 'public']
+  },
+  hotreload: {
+    port: 3001,
+    debounceTime: 300
+  },
+  esbuild: {
+    bundle: true,
+    minify: true,
+    sourcemap: true,
+    target: 'es2018'
+  },
+  sass: {
+    style: 'expanded',
+    sourceMap: true
   }
 }
 ```
 
-You can also use `.json` or `.mjs` file formats.
+## CLI Options
 
-## TypeScript Configuration
+```
+ice-build [options]
 
-Create a `tsconfig.json` file in your project root:
+Options:
+  -V, --version        output the version number
+  -c, --config <path>  Path to config file
+  -w, --watch          Watch for changes and rebuild
+  --clean              Clean output directory before building
+  -v, --verbose        Enable verbose logging
+  -h, --help           display help for command
+```
 
-```json
+## Configuration Reference
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `input.ts` | `string[]` | `['src/**/*.ts', 'src/**/*.tsx']` | TypeScript source globs |
+| `input.scss` | `string[]` | `['src/**/*.scss', 'src/**/*.sass']` | SCSS source globs |
+| `input.html` | `string[]` | `['src/**/*.html']` | HTML source globs |
+| `output.path` | `string` | `'dist'` | Output directory path |
+| `watch.paths` | `string[]` | `['src']` | Directories to watch for changes |
+| `watch.ignored` | `string[]` | `['node_modules', '.git', 'dist']` | Patterns to ignore when watching |
+| `hotreload.port` | `number` | `3001` | WebSocket server port |
+| `hotreload.debounceTime` | `number` | `300` | Debounce time for reload events (ms) |
+| `esbuild` | `object` | See below | esbuild configuration |
+| `sass` | `object` | See below | Sass compiler configuration |
+| `postcss` | `object` | See below | PostCSS configuration |
+
+### Default esbuild Configuration
+
+```js
 {
-  "compilerOptions": {
-    "rootDir": "source/ts",
-    "outDir": "public/js",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["source/*"],
-    },
-    "target": "ES2020",
-    "module": "ES2020",
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "sourceMap": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"]
-  },
-  "include": [
-    "./source",
-  ],
-  "exclude": [
-    "node_modules",
-    "public"
-  ]
+  bundle: true,
+  minify: true,
+  sourcemap: true,
+  target: 'es2018'
 }
 ```
 
-ice-build will automatically detect and use your project's `tsconfig.json` settings, including:
+### Default Sass Configuration
 
-- `target`: Determines the ECMAScript target version
-- `module`: Sets the module format (ESM, CommonJS)
-- `sourceMap`: Controls source map generation
-- `paths`: Supports TypeScript path aliases
-- Other relevant compiler options
-
-If no `tsconfig.json` is found, sensible defaults are used.
-
-## Command Line Options
-
-* `--watch`: Enables watch mode with automatic rebuilds on file changes.
-* `--verbose`: Shows detailed output during building and file watching.
-* `--project <path>`: Specifies the root directory of the project to build (defaults to current working directory).
-* `--no-lint`: Disables ESLint during the build process.
-* `--help`: Shows help information and available commands.
-
-## Advanced Features
-
-### Enhanced SCSS Partial Handling
-
-ice-build now intelligently detects SCSS imports by parsing file content:
-
-- **Smart Parsing**: Detects @import, @use, and @forward statements with accurate path resolution
-- **Selective Rebuilds**: When a partial changes, only rebuilds files that actually import it
-- **Multiple Import Syntaxes**: Supports various import methods and path styles
-
-### Path Alias Resolution
-
-Automatically resolves TypeScript path aliases from tsconfig.json:
-
-```json
+```js
 {
-  "compilerOptions": {
-    "paths": {
-      "@/*": ["source/*"],
-      "@components/*": ["source/components/*"]
-    }
-  }
+  style: 'expanded',
+  sourceMap: true
 }
 ```
 
-This allows you to use imports like:
+### Default PostCSS Configuration
 
-```typescript
-import { Button } from '@components/button';
-```
-
-### File Caching
-
-Files are only rewritten when their content changes, improving build speed.
-
-### Custom PostCSS Plugins
-
-Add your own PostCSS plugins via configuration:
-
-```javascript
-export default {
-  postcssPlugins: [
-    require('autoprefixer'),
-    require('cssnano')({ preset: 'default' }),
-    require('postcss-preset-env')()
-  ]
+```js
+{
+  plugins: [] // Autoprefixer is added automatically
 }
 ```
 
-### TypeScript File Flattening
+## Integration with ice-hotreloader
 
-Files in `source/ts/` directory (including subdirectories) are automatically placed directly in the root of `public/js/`, creating a simplified output structure.
+Ice Build integrates seamlessly with ice-hotreloader to provide live reload capabilities:
 
-### Hot Module Reloading
+- CSS changes are injected without a full page reload
+- TypeScript/HTML changes trigger a full page reload
+- SCSS partial changes trigger rebuilds of all dependent files
 
-When running in `--watch` mode:
-
-1. ice-build automatically starts a WebSocket server on port 3001 (configurable)
-2. When CSS changes, only stylesheets are refreshed (no page reload)
-3. When TS/JS changes, the page receives a reload notification
-4. Add this script tag to your HTML to enable HMR:
+To enable hot reloading, simply add the following to your HTML:
 
 ```html
-<script src="http://localhost:3001/client.js"></script>
+<script>
+  (function() {
+    const socket = new WebSocket(`ws://${location.hostname}:3001`);
+    
+    socket.addEventListener('message', (event) => {
+      const message = JSON.parse(event.data);
+      
+      if (message.type === 'css') {
+        // CSS hot reload
+        document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+          const url = new URL(link.href);
+          url.searchParams.set('t', Date.now());
+          link.href = url.toString();
+        });
+      } else if (message.type === 'full') {
+        // Full page reload
+        window.location.reload();
+      }
+    });
+  })();
+</script>
 ```
 
-## Troubleshooting
+## SCSS Dependency Tracking
 
-If files aren't being watched correctly:
+Ice Build includes intelligent SCSS dependency tracking:
 
-1. Use `--verbose` flag to see detailed file watching information
-2. Check that your directory structure matches the expected structure
-3. Try running with `--project=path/to/project` to explicitly set the project root
-4. For mounted volumes or network drives, the system should automatically adapt its watching strategy
+- When a partial file (e.g., `_variables.scss`) is changed, all files that import it are automatically rebuilt
+- Supports both `@import` and `@use` syntax
+- Handles nested dependencies
+
+## Node.js API
+
+You can also use Ice Build programmatically:
+
+```js
+import { ConfigManager, BuildManager } from '@n8d/ice-build';
+
+const configManager = new ConfigManager();
+const config = configManager.getConfig();
+const outputPath = configManager.getOutputPath();
+
+const buildManager = new BuildManager(config, outputPath);
+
+// Build all files
+await buildManager.buildAll();
+
+// Clean output directory
+await buildManager.cleanAll();
+```
+
+## Requirements
+
+- Node.js 18 or later
+- Project using TypeScript and/or SCSS/SASS
+
+## License
+
+MIT

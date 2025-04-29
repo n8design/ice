@@ -1,21 +1,22 @@
 {
-  "name": "test-ice-build-project",
+  "name": "test-ice-build",
   "version": "1.0.0",
-  "description": "A simple project to test @n8d/ice-build",
-  "private": true,
+  "description": "Test project for ice-build",
   "type": "module",
   "scripts": {
-    "build": "ice-build",
-    "watch": "ice-build --watch"
+    "start": "ice-build --watch",
+    "build": "ice-build --clean",
+    "clean": "rimraf public/*.js public/*.css public/*.map"
   },
-  "dependencies": {
-    "@n8d/ice-build": "file:../ice-build",
-    "@n8d/ice-hotreloader": "file:../ice-hotreloader"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.3",
-    "postcss": "^8.5.3",
-    "sass": "^1.87.0"
+    "@n8d/ice-build": "file:../ice-build",
+    "@n8d/ice-hotreloader": "file:../ice-hotreloader",
+    "autoprefixer": "^10.4.14",
+    "esbuild": "^0.18.0",
+    "postcss": "^8.4.24",
+    "rimraf": "^5.0.1",
+    "sass": "^1.62.1",
+    "typescript": "^5.0.4"
   }
 }

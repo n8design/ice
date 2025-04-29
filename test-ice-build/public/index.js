@@ -1,0 +1,2 @@
+import"./styles.scss";function o(e){return`Hello, ${e}! Build time: ${new Date().toLocaleTimeString()}`}var n=o("Ice Build User");console.log(n);console.debug("Debugging information:");document.addEventListener("DOMContentLoaded",()=>{let e=document.getElementById("app");e&&(e.textContent=n)});console.log("DOM fully loaded and parsed");console.log("Debugging information:");
+//# sourceMappingURL=index.js.map

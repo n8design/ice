@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../../source/make-a-bot/b.bot.scss"],"names":[],"mappings":"AAAA;EACE,iBAAiB;EACjB,gDAAgD;AAClD","file":"b.bot.css","sourcesContent":[".bo-bot {\n  content: \"Be bot\";\n  background: url(\"https://example.com/image.png\");\n}"]}
