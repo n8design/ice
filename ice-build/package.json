@@ -14,7 +14,7 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "version": "0.0.4-alpha.57",
+  "version": "0.0.4-alpha.58",
   "bin": {
     "ice-build": "./bin/ice-build.js"
   },
