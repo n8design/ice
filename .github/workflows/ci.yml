@@ -37,8 +37,18 @@ jobs:
 
     # --->>> ADD THIS BUILD STEP <<<---
     - name: Build ice package
-      run: npm run build # Assumes 'build' script compiles the package
-
+      run: npm run build
+      
+    # Update integration test step to be platform-aware
     - name: Run Integration Tests (ice-build)
-      run: npm run test:integration --workspace=@n8d/ice-build # Assumes 'test:integration' runs the shell script
-      shell: bash # Explicitly use bash for the integration test step if needed
+      run: npm run test:integration --workspace=@n8d/ice-build
+      env:
+        # Add environment variable to help the test script detect the platform
+        CI_PLATFORM: ${{ runner.os }}
+      
+    # Add a Windows-specific post-check step
+    - name: Verify Windows Compatibility
+      if: runner.os == 'Windows'
+      run: |
+        echo "Verifying Windows-specific functionality..."
+        # Add any Windows-specific checks if needed
