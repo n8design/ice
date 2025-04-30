@@ -32,17 +32,17 @@ describe('SCSS Dependency Graph Integration', () => {
     fs.mkdirSync(sourceDir, { recursive: true });
     fs.mkdirSync(outputDir, { recursive: true });
     
-    // Initial SCSS files setup
+    // Initial SCSS files setup with modern @use syntax
     writeFileSync(join(sourceDir, '_variables.scss'), 
       '$primary: blue; $secondary: green; $tertiary: red;');
     writeFileSync(join(sourceDir, '_mixins.scss'), 
       '@mixin rounded { border-radius: 5px; }');
     writeFileSync(join(sourceDir, '_layout.scss'), 
-      '@import "./variables"; .container { max-width: 1200px; color: $primary; }');
+      '@use "./variables" as *; .container { max-width: 1200px; color: $primary; }');
     writeFileSync(join(sourceDir, 'style.scss'), 
-      '@import "./variables"; @import "./layout"; @import "./mixins"; body { color: $secondary; @include rounded; }');
+      '@use "./variables" as *; @use "./layout" as *; @use "./mixins" as *; body { color: $secondary; @include rounded; }');
     writeFileSync(join(sourceDir, 'alternate.scss'), 
-      '@import "./variables"; .alternate { color: $tertiary; }');
+      '@use "./variables" as *; .alternate { color: $tertiary; }');
     
     // Create SCSS builder with real config
     const config = {
@@ -97,7 +97,7 @@ describe('SCSS Dependency Graph Integration', () => {
   });
   
   it('should rebuild dependent files when a partial changes', async () => {
-    // Create a completely new variables file with clearly different values
+    // Create a completely new variables file with clearly distinctive values
     writeFileSync(join(sourceDir, '_variables.scss'), 
       '$primary: purple !important; $secondary: orange !important; $tertiary: yellow !important;');
     
@@ -129,7 +129,7 @@ describe('SCSS Dependency Graph Integration', () => {
   it('should handle nested partial dependencies', async () => {
     // Update the layout partial with very distinctive changes
     writeFileSync(join(sourceDir, '_layout.scss'), 
-      '@import "./variables"; .container { max-width: 1400px !important; color: $primary; padding: 2rem !important; }');
+      '@use "./variables" as *; .container { max-width: 1400px !important; color: $primary; padding: 2rem !important; }');
     
     // Force rebuild the files
     await scssBuilder.buildDependencyGraph();
