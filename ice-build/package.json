@@ -14,7 +14,7 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "version": "0.0.4-alpha.60",
+  "version": "0.0.6-alpha.0",
   "bin": {
     "ice-build": "./bin/ice-build.js"
   },
@@ -30,7 +30,8 @@
     "lint": "eslint src/**/*.ts",
     "test": "vitest run",
     "test:integration": "node tests/integration/run.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "changelog": "node scripts/release.js"
   },
   "dependencies": {
     "@n8d/ice-hotreloader": "^0.0.1-alpha.15",
