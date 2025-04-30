@@ -1,0 +1,42 @@
+# filepath: /Volumes/Code/n8design/projects/ice/.github/workflows/ci.yml
+name: Ice Build CI
+
+on:
+  push:
+    branches: [ main, winfx ] # Adjust branches as needed
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test on Node ${{ matrix.node-version }} and ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        node-version: [20.x] # Test against Node 20
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm' # Cache npm dependencies
+
+    - name: Install dependencies (using npm ci for workspaces)
+      run: npm ci # Installs dependencies for all workspaces
+
+    # Optional: Add linting step
+    # - name: Lint ice-build
+    #   run: npm run lint --workspace=@n8d/ice-build
+
+    - name: Run Unit Tests (ice-build)
+      run: npm run test --workspace=@n8d/ice-build # Assumes 'test' script runs vitest
+
+    - name: Run Integration Tests (ice-build)
+      run: npm run test:integration --workspace=@n8d/ice-build # Assumes 'test:integration' runs the shell script
+      # For Windows, ensure bash is available or adapt the integration test script
+      shell: bash # Explicitly use bash for the integration test step if needed
