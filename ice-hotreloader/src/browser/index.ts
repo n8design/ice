@@ -59,14 +59,13 @@ class BrowserHMR {
 
         // Query all stylesheets that match the path
         const stylesheets = document.querySelectorAll(`link[rel="stylesheet"]`);
-        console.debug('[HMR] Query:', `link[rel="stylesheet"]`);
         const timestamp = Date.now();
-
+        
         if (stylesheets.length === 0) {
-            console.warn('[HMR] No stylesheets found matching path:', path);
+            console.warn('[HMR] No stylesheets found on page');
             return;
         }
-
+        
         // Count how many are updated
         let updatedCount = 0;
 
@@ -85,6 +84,21 @@ class BrowserHMR {
                 updatedCount++;
             }
         });
+
+        // If no matching stylesheets were found, refresh all stylesheets as fallback
+        if (updatedCount === 0) {
+            console.warn(`[HMR] No stylesheets found matching path: ${path}, refreshing all stylesheets`);
+            
+            stylesheets.forEach((stylesheet: Element) => {
+                const link = stylesheet as HTMLLinkElement;
+                const url = new URL(link.href);
+                
+                // Add or update the timestamp parameter for all stylesheets
+                url.searchParams.set('t', timestamp.toString());
+                link.href = url.toString();
+                updatedCount++;
+            });
+        }
 
         console.log(`[HMR] Refreshed ${updatedCount} stylesheet(s)`);
     }
