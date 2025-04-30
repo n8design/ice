@@ -1,6 +1,5 @@
 import { Builder, IceConfig } from '../types.js';
 import fs from 'fs/promises';
-// Use Node's built-in fs module for synchronous operations
 import * as fsSync from 'fs';
 import path from 'path';
 import * as sass from 'sass';
@@ -12,6 +11,13 @@ import { Logger } from '../utils/logger.js';
 import { formatTime } from '../utils/helpers.js';
 
 const logger = new Logger('SCSS');
+
+/**
+ * Normalize paths to use forward slashes for cross-platform compatibility
+ */
+function normalizePath(filepath: string): string {
+  return filepath.replace(/\\/g, '/');
+}
 
 export class SCSSBuilder implements Builder {
   private config: IceConfig;
@@ -113,176 +119,130 @@ export class SCSSBuilder implements Builder {
   }
 
   private buildDependencyGraph(): void {
-  try {
-    const directories = this.config.watch?.paths || ['src'];
-    
-    // Create a unified list of all scss/sass files to analyze
-    const files: string[] = [];
-    for (const dir of directories) {
-      if (fsSync.existsSync(dir)) {
-        const filesInDir = glob.sync(`${dir}/**/*.{scss,sass}`);
-        files.push(...filesInDir);
-      }
-    }
-    
-    if (files.length === 0) {
-      logger.warn('No SCSS files found for dependency tracking');
-      this.dependencyGraph = { index: {}, visitAncestors: () => ({}) };
-      return;
-    }
-    
-    // Make sure we're searching directories that actually exist
-    const existingDirs = directories.filter(dir => fsSync.existsSync(dir));
-    
-    if (existingDirs.length === 0) {
-      logger.warn('No existing directories found for SCSS dependency tracking');
-      this.dependencyGraph = { index: {}, visitAncestors: () => ({}) };
-      return;
-    }
-    
-    // Create a custom dependency graph tracking all relationships
-    const dependencyIndex: Record<string, { imports: string[], importedBy: string[] }> = {};
-    
-    // First pass: initialize all files in the index
-    for (const file of files) {
-      const absolutePath = path.resolve(file);
-      dependencyIndex[absolutePath] = { imports: [], importedBy: [] };
-    }
-    
-    // Second pass: analyze all files to find import relationships
-    for (const file of files) {
-      const absolutePath = path.resolve(file);
+    try {
+      const directories = this.config.watch?.paths || ['src'];
       
-      try {
-        const content = fsSync.readFileSync(file, 'utf8');
-        
-        // Find all @import and @use statements
-        const importMatches = [...content.matchAll(/@import\s+['"](.*?)['"]/g)];
-        const useMatches = [...content.matchAll(/@use\s+['"](.*?)['"]/g)];
-        
-        // Process all matches
-        const allMatches = [...importMatches, ...useMatches];
-        
-        for (const match of allMatches) {
-          const importPath = match[1].trim();
-          
-          // Resolve the imported file path
-          let resolvedImportPath: string | null = null;
-          
-          // Try direct path
-          for (const dir of existingDirs) {
-            // Check various possible paths (with/without underscore, with/without extension)
-            const possiblePaths = [
-              path.resolve(dir, importPath + '.scss'),
-              path.resolve(dir, importPath + '.sass'),
-              path.resolve(dir, path.dirname(importPath), '_' + path.basename(importPath) + '.scss'),
-              path.resolve(dir, path.dirname(importPath), '_' + path.basename(importPath) + '.sass'),
-            ];
-            
-            for (const possiblePath of possiblePaths) {
-              if (fsSync.existsSync(possiblePath)) {
-                resolvedImportPath = possiblePath;
-                break;
-              }
-            }
-            
-            if (resolvedImportPath) break;
-          }
-          
-          // If import was found, record the relationship
-          if (resolvedImportPath) {
-            // Make sure both files are in the index
-            if (!dependencyIndex[absolutePath]) {
-              dependencyIndex[absolutePath] = { imports: [], importedBy: [] };
-            }
-            
-            if (!dependencyIndex[resolvedImportPath]) {
-              dependencyIndex[resolvedImportPath] = { imports: [], importedBy: [] };
-            }
-            
-            // Record bidirectional relationship
-            if (!dependencyIndex[absolutePath].imports.includes(resolvedImportPath)) {
-              dependencyIndex[absolutePath].imports.push(resolvedImportPath);
-            }
-            
-            if (!dependencyIndex[resolvedImportPath].importedBy.includes(absolutePath)) {
-              dependencyIndex[resolvedImportPath].importedBy.push(absolutePath);
-            }
-            
-            logger.debug(`Dependency: ${file} imports ${resolvedImportPath}`);
-          }
+      // Create a unified list of all scss/sass files to analyze
+      const files: string[] = [];
+      for (const dir of directories) {
+        if (fsSync.existsSync(dir)) {
+          const filesInDir = glob.sync(`${dir}/**/*.{scss,sass}`);
+          files.push(...filesInDir);
         }
-      } catch (err) {
-        logger.warn(`Error analyzing imports in ${file}: ${err}`);
       }
-    }
-    
-    // Create a graph object compatible with the sass-graph interface
-    this.dependencyGraph = {
-      index: dependencyIndex,
-      visitAncestors: (filePath: string) => {
-        const result: Record<string, boolean> = {};
-        const visited = new Set<string>();
+      
+      if (files.length === 0) {
+        logger.warn('No SCSS files found for dependency tracking');
+        this.dependencyGraph = { index: {}, visitAncestors: () => ({}) };
+        return;
+      }
+      
+      // Process each directory separately
+      let combinedGraph: any = null;
+      
+      for (const dir of directories) {
+        if (!fsSync.existsSync(dir)) continue;
         
-        const visit = (pathToVisit: string) => {  // Renamed parameter to avoid conflict
-          if (visited.has(pathToVisit)) return;
-          visited.add(pathToVisit);
+        try {
+          // Use parseDir for each directory
+          const graph = sassGraph.parseDir(dir, {
+            loadPath: directories,
+            extensions: ['scss', 'sass']
+          });
           
-          const resolvedPath = path.resolve(pathToVisit);  // Now using the path module correctly
-          const node = dependencyIndex[resolvedPath];
-          
-          if (!node) return;
-          
-          // Add all files that import this one
-          for (const importerPath of node.importedBy) {
-            result[importerPath] = true;
-            // Recursive to get transitive dependencies
-            visit(importerPath);
+          if (!combinedGraph) {
+            combinedGraph = graph;
+          } else if (graph && graph.index) {
+            // Merge the indexes from different directories
+            Object.assign(combinedGraph.index, graph.index);
           }
-        };
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          logger.warn(`Error in sass-graph directory parsing: ${errorMessage}`);
+        }
+      }
+      
+      // Create a normalized version of the graph for cross-platform compatibility
+      const graph = combinedGraph || { index: {}, visitAncestors: () => ({}) };
+      
+      // Normalize all paths in the graph
+      if (graph && graph.index) {
+        // Define the type for the normalized index
+        const normalizedIndex: Record<string, { 
+          imports: string[], 
+          importedBy: string[] 
+        }> = {};
         
-        visit(path.resolve(filePath));
-        return result;
+        Object.keys(graph.index).forEach((key: string) => {
+          // Normalize key path (replace backslashes with forward slashes)
+          const normalizedKey = normalizePath(key);
+          
+          // Copy node with normalized paths for imports and importedBy
+          normalizedIndex[normalizedKey] = {
+            imports: (graph.index[key]?.imports || []).map((p: string) => normalizePath(p)),
+            importedBy: (graph.index[key]?.importedBy || []).map((p: string) => normalizePath(p))
+          };
+        });
+        
+        // Replace the index with the normalized version
+        graph.index = normalizedIndex;
+        
+        // Wrap the visitAncestors method to handle normalized paths
+        const originalVisitAncestors = graph.visitAncestors;
+        graph.visitAncestors = (filePath: string) => {
+          // Always normalize input path
+          const normalizedPath = normalizePath(filePath);
+          
+          // Try with normalized path first
+          let result = originalVisitAncestors.call(graph, normalizedPath) || {};
+          
+          // If no results, try with original path
+          if (Object.keys(result).length === 0) {
+            const originalResult = originalVisitAncestors.call(graph, filePath) || {};
+            result = originalResult;
+          }
+          
+          return result;
+        };
       }
-    };
-    
-    const fileCount = Object.keys(dependencyIndex).length;
-    const relationshipCount = Object.values(dependencyIndex).reduce(
-      (sum, node) => sum + node.importedBy.length, 0
-    );
-    
-    logger.info(`Built dependency graph with ${fileCount} SCSS files and ${relationshipCount} import relationships`);
-    
-    // Log some sample relationships for debugging
-    const sampleFiles = Object.keys(dependencyIndex).filter(
-      f => path.basename(f).startsWith('_') && dependencyIndex[f].importedBy.length > 0
-    ).slice(0, 3);
-    
-    if (sampleFiles.length > 0) {
-      for (const partial of sampleFiles) {
-        const importers = dependencyIndex[partial].importedBy.map(p => path.basename(p)).join(', ');
-        logger.debug(`Example: ${path.basename(partial)} is imported by: ${importers}`);
-      }
+      
+      this.dependencyGraph = graph;
+      
+      const fileCount = this.dependencyGraph.index ? Object.keys(this.dependencyGraph.index).length : 0;
+      logger.info(`Built dependency graph with ${fileCount} SCSS files`);
+
+    } catch (error: any) {
+      logger.error(`Failed to build dependency graph: ${error.message}`);
+      // Create an empty graph to avoid null reference errors
+      this.dependencyGraph = { index: {}, visitAncestors: () => ({}) };
     }
-  } catch (error: any) {
-    logger.error(`Failed to build dependency graph: ${error.message}`);
-    // Create an empty graph to avoid null reference errors
-    this.dependencyGraph = { index: {}, visitAncestors: () => ({}) };
   }
-}
 
   private async processPartial(partialPath: string): Promise<void> {
-    // Find all main files that depend on this partial
-    if (!this.dependencyGraph) {
-      this.buildDependencyGraph();
-    }
+    // Rebuild the dependency graph to ensure we have the latest relationships
+    this.buildDependencyGraph();
     
     try {
-      // Use absolute path to ensure consistent path handling
+      // Normalize the path with consistent separators for cross-platform compatibility
+      const normalizedPath = normalizePath(path.normalize(partialPath));
       const absolutePartialPath = path.resolve(partialPath);
+      const normalizedAbsolutePath = normalizePath(absolutePartialPath);
       
-      // Get all files that import this partial
-      const dependents = this.dependencyGraph.visitAncestors(absolutePartialPath) || {};
+      // Get all files that import this partial - try multiple path formats
+      let dependents = this.dependencyGraph.visitAncestors(normalizedAbsolutePath) || {};
+      
+      // If no results, try other path formats
+      if (Object.keys(dependents).length === 0) {
+        dependents = this.dependencyGraph.visitAncestors(absolutePartialPath) || {};
+      }
+      
+      if (Object.keys(dependents).length === 0) {
+        dependents = this.dependencyGraph.visitAncestors(normalizedPath) || {};
+      }
+      
+      if (Object.keys(dependents).length === 0) {
+        dependents = this.dependencyGraph.visitAncestors(partialPath) || {};
+      }
       
       // Filter out other partials to get just the main files
       const mainFiles = Object.keys(dependents)
@@ -290,18 +250,29 @@ export class SCSSBuilder implements Builder {
       
       logger.info(`Found ${mainFiles.length} main files that depend on ${partialPath}`);
       
+      // Always rebuild all main files to be safe
       if (mainFiles.length === 0) {
         // Detailed logging to help diagnose the issue
         logger.warn(`No main files found that import ${partialPath}`);
         logger.debug(`Available dependencies: ${JSON.stringify(Object.keys(this.dependencyGraph.index))}`);
         
-        // Check if the partial file exists in the dependency index
-        const normalizedPath = path.normalize(absolutePartialPath);
-        if (!this.dependencyGraph.index[normalizedPath]) {
-          logger.warn(`Partial ${partialPath} is not in the dependency graph`);
-          
-          // Rebuild the dependency graph to catch new files
-          this.buildDependencyGraph();
+        // If we couldn't find dependencies through the graph, try a manual approach
+        const possibleMainFiles = await glob(`${this.config.watch?.paths?.[0] || 'src'}/**/*.s[ac]ss`);
+        const nonPartialFiles = possibleMainFiles.filter(file => !path.basename(file).startsWith('_'));
+        
+        for (const mainFile of nonPartialFiles) {
+          try {
+            const content = fsSync.readFileSync(mainFile, 'utf8');
+            const baseName = path.basename(partialPath);
+            const baseNameWithoutUnderscore = baseName.startsWith('_') ? baseName.substring(1) : baseName;
+            
+            // If the file might import our partial, process it
+            if (content.includes(baseNameWithoutUnderscore) || content.includes(baseName)) {
+              await this.processScssFile(mainFile);
+            }
+          } catch (err) {
+            // Ignore read errors
+          }
         }
       }
       
@@ -393,11 +364,25 @@ export class SCSSBuilder implements Builder {
     }
     
     try {
-      // Use absolute path to ensure consistent path handling
+      // Use multiple path formats to improve cross-platform compatibility
+      const normalizedPath = normalizePath(path.normalize(partialPath));
       const absolutePartialPath = path.resolve(partialPath);
+      const normalizedAbsolutePath = normalizePath(absolutePartialPath);
       
-      // Get all files that import this partial
-      const dependents = this.dependencyGraph.visitAncestors(absolutePartialPath) || {};
+      // Try multiple path formats to find dependencies
+      let dependents = this.dependencyGraph.visitAncestors(normalizedAbsolutePath) || {};
+      
+      if (Object.keys(dependents).length === 0) {
+        dependents = this.dependencyGraph.visitAncestors(absolutePartialPath) || {};
+      }
+      
+      if (Object.keys(dependents).length === 0) {
+        dependents = this.dependencyGraph.visitAncestors(normalizedPath) || {};
+      }
+      
+      if (Object.keys(dependents).length === 0) {
+        dependents = this.dependencyGraph.visitAncestors(partialPath) || {};
+      }
       
       // Filter out other partials to get just the main files
       const mainFiles = Object.keys(dependents)
