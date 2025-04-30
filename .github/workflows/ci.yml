@@ -18,6 +18,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Required for nx affected commands and git tag history
 
     - name: Set up Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
@@ -28,27 +30,26 @@ jobs:
     - name: Install dependencies (using npm ci for workspaces)
       run: npm ci # Installs dependencies for all workspaces
 
-    # Optional: Add linting step
-    # - name: Lint ice-build
-    #   run: npm run lint --workspace=@n8d/ice-build
-
-    - name: Run Unit Tests (ice-build)
-      run: npm run test --workspace=@n8d/ice-build # Assumes 'test' script runs vitest
-
-    # --->>> ADD THIS BUILD STEP <<<---
-    - name: Build ice package
+    # Use NX for running tests across affected packages
+    - name: Lint packages
+      run: npx nx affected --target=lint
+      
+    - name: Run Unit Tests (all workspaces)
+      run: npx nx affected --target=test
+      
+    - name: Build all packages
       run: npm run build
       
-    # Update integration test step to be platform-aware
+    # Test both ice-build and ice-hotreloader integration
     - name: Run Integration Tests (ice-build)
       run: npm run test:integration --workspace=@n8d/ice-build
       env:
-        # Add environment variable to help the test script detect the platform
         CI_PLATFORM: ${{ runner.os }}
-      
-    # Add a Windows-specific post-check step
+        
+    # Add Windows-specific path normalization tests
     - name: Verify Windows Compatibility
       if: runner.os == 'Windows'
       run: |
-        echo "Verifying Windows-specific functionality..."
-        # Add any Windows-specific checks if needed
+        echo "Verifying Windows-specific path normalization..."
+        cd ice-build
+        npx vitest run path-utils
