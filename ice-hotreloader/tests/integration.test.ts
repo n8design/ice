@@ -1,53 +1,16 @@
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
 import { HotReloadServer } from '../src/server/index.js';
+import { BrowserHMR } from '../src/browser/index.js';
 import * as path from 'path';
 import * as fs from 'fs';
 import { tmpdir } from 'os';
-import { execSync } from 'child_process';
 import { WebSocket } from 'ws';
+import { WS_OPEN } from './utils/test-helpers.js';
 
-// Create constants for WebSocket readyState values
-const OPEN = 1;
-
-// Mock WebSocket client for testing
-class MockWebSocketClient {
-  url: string;
-  onmessage: ((event: any) => void) | null = null;
-  onopen: (() => void) | null = null;
-  onclose: (() => void) | null = null;
-  onerror: ((error: any) => void) | null = null;
-  readyState = OPEN;
-  
-  constructor(url: string) {
-    this.url = url;
-  }
-  
-  send(data: string) {
-    // Mock send method
-  }
-  
-  close() {
-    if (this.onclose) this.onclose();
-  }
-  
-  // Simulate receiving a message
-  mockReceive(data: any) {
-    if (this.onmessage) {
-      this.onmessage({ data: JSON.stringify(data) });
-    }
-  }
-  
-  // Simulate connection
-  mockConnect() {
-    if (this.onopen) this.onopen();
-  }
-}
-
-// Integration test with ice-build simulation
+// Integration test with real paths and configurations
 describe('Ice HotReloader Integration', () => {
   let server: HotReloadServer;
   let tempDir: string;
-  let mockClient: MockWebSocketClient;
   
   // Create temp directory for tests
   beforeAll(() => {
@@ -57,8 +20,11 @@ describe('Ice HotReloader Integration', () => {
     // Create test directories
     fs.mkdirSync(path.join(tempDir, 'public', 'styles'), { recursive: true });
     
-    // Start server
-    server = new HotReloadServer(3099, { outputDir: path.join(tempDir, 'public') });
+    // Start server with custom output dir
+    server = new HotReloadServer({ 
+      port: 3099, 
+      outputDir: path.join(tempDir, 'public')
+    });
   });
   
   afterAll(() => {
@@ -76,9 +42,9 @@ describe('Ice HotReloader Integration', () => {
       const unixPath = `${path.join(tempDir, 'public')}/styles/main.css`.replace(/\\/g, '/');
       const clientSpy = vi.fn();
       
-      // Add mock client to server with proper type casting
+      // Add mock client to server
       server['clients'].add({ 
-        readyState: OPEN,
+        readyState: WS_OPEN,
         send: clientSpy
       } as unknown as WebSocket);
       
@@ -94,9 +60,9 @@ describe('Ice HotReloader Integration', () => {
       const windowsPath = `${path.join(tempDir, 'public')}\\styles\\main.css`;
       const clientSpy = vi.fn();
       
-      // Add mock client to server with proper type casting
+      // Add mock client to server
       server['clients'].add({ 
-        readyState: OPEN,
+        readyState: WS_OPEN,
         send: clientSpy
       } as unknown as WebSocket);
       
@@ -112,9 +78,9 @@ describe('Ice HotReloader Integration', () => {
       const mixedPath = `${path.join(tempDir, 'public')}/styles\\components/button.css`;
       const clientSpy = vi.fn();
       
-      // Add mock client to server with proper type casting
+      // Add mock client to server
       server['clients'].add({ 
-        readyState: OPEN,
+        readyState: WS_OPEN,
         send: clientSpy
       } as unknown as WebSocket);
       
@@ -134,9 +100,9 @@ describe('Ice HotReloader Integration', () => {
       
       const clientSpy = vi.fn();
       
-      // Add mock client to server with proper type casting
+      // Add mock client to server
       server['clients'].add({ 
-        readyState: OPEN,
+        readyState: WS_OPEN,
         send: clientSpy
       } as unknown as WebSocket);
       
@@ -156,9 +122,9 @@ describe('Ice HotReloader Integration', () => {
     it('should handle multiple file changes in succession', () => {
       const clientSpy = vi.fn();
       
-      // Add mock client to server with proper type casting
+      // Add mock client to server
       server['clients'].add({ 
-        readyState: OPEN,
+        readyState: WS_OPEN,
         send: clientSpy
       } as unknown as WebSocket);
       

@@ -1,5 +1,7 @@
 import { createServer } from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
+import { normalizePath, removeOutputDirPrefix } from '../utils/path-utils.js';
+import { HotReloaderOptions, mergeWithDefaults } from '../utils/config.js';
 
 // Helper function for getting the current time
 function getCurrentTime(): string {
@@ -11,12 +13,24 @@ function getCurrentTime(): string {
 export class HotReloadServer {
     private wss: WebSocketServer;
     private clients: Set<WebSocket> = new Set();
-    private baseOutputDir: string = 'public'; // Default output directory
+    private options: Required<HotReloaderOptions>;
     
-    constructor(port: number = 3001, options: { outputDir?: string } = {}) {
-        if (options.outputDir) {
-            this.baseOutputDir = options.outputDir.replace(/\\/g, '/').replace(/\/$/, '');
+    constructor(portOrOptions: number | HotReloaderOptions = {}, legacyOptions: HotReloaderOptions = {}) {
+        // Handle both new and legacy constructor formats
+        let options: HotReloaderOptions = {};
+        
+        if (typeof portOrOptions === 'number') {
+            // Legacy format: port, { outputDir }
+            options = { 
+                port: portOrOptions,
+                ...legacyOptions
+            };
+        } else {
+            // New format: { port, outputDir, ... }
+            options = portOrOptions;
         }
+        
+        this.options = mergeWithDefaults(options);
         
         const server = createServer();
         this.wss = new WebSocketServer({ server });
@@ -32,45 +46,54 @@ export class HotReloadServer {
 
             ws.on('error', (error) => {
                 console.error(`🔥 [${getCurrentTime()}] Client error:`, error);
-                ws.close();
+                try {
+                    ws.close();
+                } catch (closeError) {
+                    console.error(`🔥 [${getCurrentTime()}] Error closing connection:`, closeError);
+                }
             });
         });
         
-        server.listen(port);
-        console.log(`🔥 [${getCurrentTime()}] HMR running on port ${port}`);
+        server.listen(this.options.port);
+        console.log(`🔥 [${getCurrentTime()}] HMR running on port ${this.options.port}`);
     }
     
-    // Methods like notifyClients, etc.
     notifyClients(type: string, path: string) {
-        // Normalize path for URLs: convert backslashes to forward slashes
-        const normalizedPath = path.replace(/\\/g, '/');
+        // Normalize and clean path using utility functions
+        const normalizedPath = normalizePath(path);
+        const cleanPath = removeOutputDirPrefix(normalizedPath, this.options.outputDir);
         
-        // Remove output directory prefix if it exists (configured dynamically)
-        const outputDirPattern = new RegExp(`^${this.baseOutputDir}/`);
-        const cleanPath = normalizedPath.replace(outputDirPattern, '');
-        
-        const message = JSON.stringify({ type, path: cleanPath });
-        
-        // Get the filename from the path for more concise messaging
-        const filename = cleanPath.split('/').pop() || cleanPath;
-        
-        if (type === 'css') {
-            console.log(`🔥 [${getCurrentTime()}] 📤 Refresh CSS: ${filename}`);
-        } else if (type === 'full') {
-            console.log(`🔥 [${getCurrentTime()}] 📤 Refresh code${filename ? ': ' + filename : ''}`);
-        } else {
-            console.log(`🔥 [${getCurrentTime()}] 📤 Refresh ${type}: ${filename}`);
-        }
-        
-        this.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(message);
+        try {
+            const message = JSON.stringify({ type, path: cleanPath });
+            
+            // Get the filename from the path for more concise messaging
+            const filename = cleanPath.split('/').pop() || cleanPath;
+            
+            if (type === 'css') {
+                console.log(`🔥 [${getCurrentTime()}] 📤 Refresh CSS: ${filename}`);
+            } else if (type === 'full') {
+                console.log(`🔥 [${getCurrentTime()}] 📤 Refresh code${filename ? ': ' + filename : ''}`);
+            } else {
+                console.log(`🔥 [${getCurrentTime()}] 📤 Refresh ${type}: ${filename}`);
             }
-        });
+            
+            this.clients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                    try {
+                        client.send(message);
+                    } catch (error) {
+                        console.error(`🔥 [${getCurrentTime()}] Failed to send message to client:`, error);
+                    }
+                }
+            });
+        } catch (error) {
+            console.error(`🔥 [${getCurrentTime()}] Error creating notification:`, error);
+        }
     }
     
-    // Allow updating the output directory
+    // Legacy method for backward compatibility
     setOutputDir(dir: string): void {
-        this.baseOutputDir = dir.replace(/\\/g, '/').replace(/\/$/, '');
+        // Make sure we properly normalize the path
+        this.options.outputDir = normalizePath(dir);
     }
 }

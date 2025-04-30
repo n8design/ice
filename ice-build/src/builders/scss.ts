@@ -353,19 +353,49 @@ export class SCSSBuilder extends BuilderBase {
     
     // Match all import patterns
     const patterns = [
-      // @import "path";
+      // @import "path"; or @import 'path';
       /@import\s+['"]([^'"]+)['"]/g,
-      // @use "path";
+      
+      // @import "path1", "path2"; (multiple imports in one line)
+      /@import\s+(?:[^;]+,\s*)*['"]([^'"]+)['"]/g,
+      
+      // @use "path"; or @use "path" as namespace;
       /@use\s+['"]([^'"]+)['"]/g,
-      // @forward "path";
+      
+      // @forward "path"; or @forward "path" show/hide/as variations
       /@forward\s+['"]([^'"]+)['"]/g
     ];
     
+    // Process each pattern
     patterns.forEach(pattern => {
       let match;
+      // Reset lastIndex for each iteration to avoid issues with global regex
+      pattern.lastIndex = 0;
+      
       while ((match = pattern.exec(content)) !== null) {
+        // Skip if in a comment - simple check, not handling all edge cases
+        const contextBefore = content.substring(0, match.index).trim();
+        if (contextBefore.endsWith('//') || 
+            (contextBefore.lastIndexOf('/*') > contextBefore.lastIndexOf('*/'))) {
+          continue;
+        }
+        
         if (match[1] && !imports.includes(match[1])) {
           imports.push(match[1]);
+        }
+        
+        // For @import with multiple paths in one statement
+        if (match[0].includes(',')) {
+          const importStatement = match[0];
+          const additionalPaths = importStatement.match(/['"]([^'"]+)['"]/g);
+          if (additionalPaths) {
+            additionalPaths.forEach(path => {
+              const cleanPath = path.replace(/['"]/g, '');
+              if (!imports.includes(cleanPath)) {
+                imports.push(cleanPath);
+              }
+            });
+          }
         }
       }
     });

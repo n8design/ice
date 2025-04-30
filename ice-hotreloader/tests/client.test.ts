@@ -1,92 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrowserHMR } from '../src/browser/index.js';
-
-// Define constants for WebSocket states
-const WS_CONNECTING = 0;
-const WS_OPEN = 1;
-const WS_CLOSING = 2;
-const WS_CLOSED = 3;
-
-// Create a simple mock interface
-interface MockWebSocket {
-  addEventListener: any;
-  readyState: 0 | 1 | 2 | 3;
-  _listeners: Record<string, Function[]>;
-  _triggerEvent: (eventName: string, data: any) => void;
-}
-
-// Mock DOM elements and browser APIs
-const setupMockDOM = () => {
-  // Mock document
-  global.document = {
-    querySelectorAll: vi.fn().mockReturnValue([]),
-    createElement: vi.fn(),
-    head: { appendChild: vi.fn() },
-    addEventListener: vi.fn()
-  } as any;
-  
-  // Mock location
-  global.location = {
-    hostname: 'localhost',
-    protocol: 'http:',
-    reload: vi.fn()
-  } as any;
-  
-  // Create a mockWebSocket instance with listeners
-  const listeners: Record<string, Function[]> = {
-    'open': [],
-    'message': [],
-    'close': [],
-    'error': []
-  };
-  
-  const mockWebSocketInstance: MockWebSocket = {
-    addEventListener: vi.fn((event, handler) => {
-      listeners[event] = listeners[event] || [];
-      listeners[event].push(handler);
-    }),
-    readyState: WS_OPEN as 1, // Explicitly type as 1 (OPEN) to satisfy the union type
-    _listeners: listeners,
-    _triggerEvent: (eventName, data) => {
-      if (listeners[eventName]) {
-        listeners[eventName].forEach(handler => handler(data));
-      }
-    }
-  };
-  
-  // Create a properly typed WebSocket constructor mock
-  const webSocketConstructorMock = vi.fn(() => mockWebSocketInstance) as any;
-  
-  // Add static properties after casting to any
-  webSocketConstructorMock.CONNECTING = WS_CONNECTING;
-  webSocketConstructorMock.OPEN = WS_OPEN;
-  webSocketConstructorMock.CLOSING = WS_CLOSING;
-  webSocketConstructorMock.CLOSED = WS_CLOSED;
-  
-  // Assign to global
-  global.WebSocket = webSocketConstructorMock;
-  
-  // Mock window
-  global.window = {
-    addEventListener: vi.fn()
-  } as any;
-  
-  // Mock console
-  global.console = {
-    log: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn()
-  } as any;
-  
-  return {
-    mockWebSocketInstance
-  };
-};
+import { setupMockDOM } from './utils/test-helpers.js';
 
 describe('BrowserHMR', () => {
   let browserHMR: BrowserHMR;
-  let mockWebSocket: MockWebSocket;
+  let mockWebSocket: any;
   
   beforeEach(() => {
     const mocks = setupMockDOM();
@@ -108,6 +26,11 @@ describe('BrowserHMR', () => {
     it('should use correct port if specified', () => {
       browserHMR = new BrowserHMR(3002);
       expect(global.WebSocket).toHaveBeenCalledWith('ws://localhost:3002');
+    });
+    
+    it('should support new options format', () => {
+      browserHMR = new BrowserHMR({ port: 3003 });
+      expect(global.WebSocket).toHaveBeenCalledWith('ws://localhost:3003');
     });
     
     it('should use wss protocol when using https', () => {
@@ -178,6 +101,42 @@ describe('BrowserHMR', () => {
       
       // Restore Date.now
       Date.now = originalNow;
+    });
+    
+    it('should respect fallback configuration option', () => {
+      // Setup mock CSS links that won't match
+      const mockLinks = [
+        { href: 'http://localhost/styles/main.css' },
+        { href: 'http://localhost/styles/secondary.css' }
+      ];
+      global.document.querySelectorAll = vi.fn().mockReturnValue(mockLinks);
+      
+      // Create URL mock
+      global.URL = class {
+        pathname: string;
+        searchParams: any;
+        
+        constructor(href: string) {
+          this.pathname = '/other/style.css'; // Won't match the test path
+          this.searchParams = {
+            set: vi.fn(),
+            toString: () => '?t=12345'
+          };
+        }
+        
+        toString() {
+          return 'http://localhost/styles/main.css?t=12345';
+        }
+      } as any;
+      
+      // Create client with fallback disabled
+      browserHMR = new BrowserHMR({ refreshAllStylesheetsOnNoMatch: false });
+      
+      // Access private method
+      (browserHMR as any).refreshCSS('nonexistent/path.css');
+      
+      // Check that neither stylesheet was updated (searchParams.set not called)
+      expect(mockLinks[0].href).not.toContain('t=');
     });
     
     it('should handle multiple stylesheets', () => {
