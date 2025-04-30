@@ -11,11 +11,12 @@ vi.mock('fs/promises', () => ({
   }
 }));
 
+// Fix the fs module mock - need to expose existsSync properly
 vi.mock('fs', () => ({
-  default: {
-    existsSync: vi.fn().mockReturnValue(true),
-    readFileSync: vi.fn().mockReturnValue('@import "./variables"; body { color: $primary; }')
-  }
+  existsSync: vi.fn().mockReturnValue(true),
+  readFileSync: vi.fn().mockReturnValue('@import "./variables"; body { color: $primary; }'),
+  writeFileSync: vi.fn(),
+  mkdirSync: vi.fn()
 }));
 
 vi.mock('glob', () => ({
@@ -23,9 +24,11 @@ vi.mock('glob', () => ({
   sync: vi.fn().mockReturnValue(['style.scss'])
 }));
 
+// Update sass mock to use modern API
 vi.mock('sass', () => ({
   compile: vi.fn().mockReturnValue({
-    css: 'body { color: blue; }'
+    css: 'body { color: blue; }',
+    sourceMap: 'sourcemap-content'
   })
 }));
 
