@@ -51,6 +51,14 @@
         "access": "public",
         "dryRun": false,
         "verbose": true
+      },
+      "configurations": {
+        "production": {
+          "distTag": "latest"
+        },
+        "alpha": {
+          "distTag": "alpha"
+        }
       }
     }
   }
