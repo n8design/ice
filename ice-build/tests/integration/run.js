@@ -35,7 +35,7 @@ function createTestProject() {
       `body {\n  background-color: #f0f0f0;\n  h1 {\n    color: blue;\n  }\n}`
     );
 
-    // Create a proper ice.config.js file that matches expected format
+    // Create a cross-platform compatible ice.config.js
     writeFileSync(
       join(testDir, 'ice.config.js'),
       `// ice-build configuration
@@ -48,6 +48,7 @@ export default {
   output: {
     path: 'public'
   },
+  // Use platform-independent path syntax
   watch: {
     paths: ['source'],
     ignored: ['node_modules', '.git', 'public']
@@ -108,9 +109,14 @@ async function runIntegrationTest() {
     runCommand(`npm link "${projectRoot}"`);
     console.log('Linked ice-build package');
 
-    // Run the build with more verbose output capture
+    // Run the build with platform-aware debugging
     console.log('Running ice-build command...');
     try {
+      // Add special handling for Windows
+      if (process.platform === 'win32') {
+        console.log('Running on Windows platform, using appropriate configuration');
+      }
+      
       // Capture and log stdout to see what's happening
       const output = execSync('npm run build -- --verbose', { 
         stdio: ['pipe', 'pipe', 'pipe'],

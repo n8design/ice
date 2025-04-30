@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SCSSBuilder } from '../../src/builders/scss.js';
-import path from 'path';
-import fs from 'fs';
 
 // Mock dependencies
 vi.mock('fs/promises', () => ({
@@ -80,18 +78,17 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 describe('SCSSBuilder', () => {
-  // Fixed mockConfig to include all required properties
   const mockConfig = {
     input: {
+      ts: ['source/**/*.ts'],  // Add required ts field
       scss: ['source/**/*.scss'],
-      ts: ['source/**/*.ts', 'source/**/*.tsx'], // Added required ts property
-      html: ['source/**/*.html']  // Added optional html property
+      html: ['source/**/*.html'] // Add html field
     },
     output: { path: 'public' },
     watch: { paths: ['source'], ignored: ['node_modules'] },
     sass: { style: 'expanded', sourceMap: true },
     postcss: { plugins: [] },
-    // Add other required config properties
+    // Add missing required config fields
     hotreload: {
       port: 3001,
       debounceTime: 300

@@ -31,12 +31,11 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 describe('TypeScriptBuilder', () => {
-  // Fixed mockConfig to include all required properties
   const mockConfig = {
     input: {
       ts: ['source/**/*.ts', 'source/**/*.tsx'],
-      scss: ['source/**/*.scss'], // Added required scss property
-      html: ['source/**/*.html']  // Added optional html property
+      scss: ['source/**/*.scss'], // Add required scss field
+      html: ['source/**/*.html']  // Add html field
     },
     output: { path: 'public' },
     watch: { paths: ['source'], ignored: ['node_modules'] },
@@ -46,7 +45,7 @@ describe('TypeScriptBuilder', () => {
       sourcemap: true,
       target: 'es2018'
     },
-    // Add other required config properties
+    // Add missing required config fields
     hotreload: {
       port: 3001,
       debounceTime: 300
@@ -68,7 +67,7 @@ describe('TypeScriptBuilder', () => {
   });
 
   it('should build typescript files', async () => {
-    // Mock the resolveEntryPoints method directly to avoid the glob issue
+    // Mock the internal method to avoid "files is not iterable" error
     vi.spyOn(tsBuilder, 'resolveEntryPoints' as any).mockResolvedValue(['index.ts']);
     
     await expect(tsBuilder.build()).resolves.not.toThrow();

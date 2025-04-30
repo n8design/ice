@@ -51,7 +51,10 @@ describe('ConfigManager', () => {
     expect(config.output.path).toBe('public'); // Changed to match updated default
     expect(config.input.ts).toContain('source/**/*.ts'); // Update to look for source pattern
     expect(config.input.scss).toContain('source/**/*.scss'); // Update to look for source pattern
-    expect(fs.existsSync).toHaveBeenCalledTimes(2);
+    
+    // Updated expectation to match the actual number of calls
+    // Our new implementation checks for 3 possible config file names
+    expect(fs.existsSync).toHaveBeenCalledTimes(3);
   });
 
   it('should resolve output path correctly', () => {
