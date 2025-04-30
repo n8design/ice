@@ -46,7 +46,11 @@
       "dependsOn": ["build"],
       "options": {
         "packageRoot": "{projectRoot}",
-        "publishable": true
+        "publishable": true,
+        "registry": "https://registry.npmjs.org/",
+        "access": "public",
+        "dryRun": false,
+        "verbose": true
       }
     }
   }
