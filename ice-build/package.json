@@ -29,6 +29,7 @@
     "clean": "rimraf dist",
     "lint": "eslint src/**/*.ts",
     "test": "vitest run",
+    "test:integration": "node tests/integration/run.js",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
@@ -45,6 +46,7 @@
     "sass-graph": "^4.0.1"
   },
   "devDependencies": {
+    "@types/estree": "^1.0.5",
     "@types/lodash.debounce": "^4.0.7",
     "@types/node": "^18.16.16",
     "@types/sass-graph": "^2.1.2",

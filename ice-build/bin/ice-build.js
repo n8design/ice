@@ -2,7 +2,7 @@
 
 import { CLI } from '../dist/cli/index.js';
 
-// Create and run the CLI
+// Create and run the CLI with proper arguments
 const cli = new CLI();
 cli.run(process.argv).catch((error) => {
   console.error(`Fatal error: ${error.message}`);

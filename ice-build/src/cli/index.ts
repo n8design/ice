@@ -35,8 +35,7 @@ export class CLI {
       .option('--clean', 'Clean output directory before building')
       .option('-v, --verbose', 'Enable verbose logging')
       .action((options) => {
-        // Important: Don't use async here directly
-        // Instead, call a method that returns a promise but don't await it
+        // Important: Always perform the default action when no subcommand is specified
         if (options.watch) {
           logger.info('Starting in watch mode...');
           this.executeWatch(options).catch(error => {
@@ -51,9 +50,6 @@ export class CLI {
           });
         }
       });
-
-    // Remove the subcommand definitions since they can cause confusion
-    // when the main command already handles everything with flags
   }
 
   private async executeBuild(options: any): Promise<void> {
@@ -135,12 +131,12 @@ export class CLI {
       // Process the arguments and ensure the action is called
       await this.program.parseAsync(argv);
       
-      // If no recognized command/option was provided, show help
-      const options = this.program.opts();
-      if (Object.keys(options).length === 0 || 
-         (Object.keys(options).length === 1 && options.version)) {
-        this.program.help();
-      }
+      // Remove this block that's showing help - this is interfering with our command execution
+      // const options = this.program.opts();
+      // if (Object.keys(options).length === 0 || 
+      //    (Object.keys(options).length === 1 && options.version)) {
+      //   this.program.help();
+      // }
     } catch (error: any) {
       logger.error(`Error: ${error.message}`);
       process.exit(1);
