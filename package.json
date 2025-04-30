@@ -104,11 +104,9 @@
     "// Version sync utilities": "",
     "sync:ice-build": "npm run npm:view-build && npm version --prefix ice-build $(npm view @n8d/ice-build version --json | jq -r 'if type==\"array\" then max else . end')",
     "sync:ice-hotreloader": "npm run npm:view-hotreloader && npm version --prefix ice-hotreloader $(npm view @n8d/ice-hotreloader version --json | jq -r 'if type==\"array\" then max else . end')",
-    "sync:all": "npm run sync:ice-build && npm run sync:ice-hotreloader && git add */package.json && git commit -m \"chore: sync versions with npm registry\" && git push",
+    "sync:all": "npm run sync:ice-build && npm run sync:ice-hotreloader && git add */package.json && git commit -m \"chore: sync versions with npm registry\" && git push"
     
-    "// Force new version": "",
-    "bump:major:ice-build": "cd ice-build && npm version major && cd ../ && git push --follow-tags",
-    "bump:minor:ice-build": "cd ice-build && npm version minor && cd ../ && git push --follow-tags"
+
   },
   "dependencies": {
     "npm-run-all": "^4.1.5"
