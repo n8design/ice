@@ -57,41 +57,49 @@ class BrowserHMR {
     private refreshCSS(path: string) {
         console.log('[HMR] Refreshing CSS for path:', path);
 
-        // Query all stylesheets that match the path
-        const stylesheets = document.querySelectorAll(`link[rel="stylesheet"]`);
+        // Query all stylesheets
+        const stylesheets = document.querySelectorAll('link[rel="stylesheet"]');
         const timestamp = Date.now();
         
+        // Check if there are any stylesheets at all
         if (stylesheets.length === 0) {
             console.warn('[HMR] No stylesheets found on page');
             return;
         }
         
-        // Count how many are updated
+        // Try to find specific stylesheet matches first
         let updatedCount = 0;
+        let foundMatch = false;
 
-        // Update each matching stylesheet
+        // First pass: check for direct matches
         stylesheets.forEach((stylesheet: Element) => {
             const link = stylesheet as HTMLLinkElement;
             const url = new URL(link.href);
             
-            // Only update stylesheets that actually match the path
+            // Only update stylesheets that match the path
             if (url.pathname.includes(path)) {
-                console.log(`[HMR] Refreshing: ${link.href}`);
+                console.log(`[HMR] Direct match found: ${link.href}`);
                 
                 // Add or update the timestamp parameter
                 url.searchParams.set('t', timestamp.toString());
                 link.href = url.toString();
                 updatedCount++;
+                foundMatch = true;
             }
         });
 
-        // If no matching stylesheets were found, refresh all stylesheets as fallback
-        if (updatedCount === 0) {
-            console.warn(`[HMR] No stylesheets found matching path: ${path}, refreshing all stylesheets`);
+        // If no direct matches were found, refresh all stylesheets as fallback
+        if (!foundMatch) {
+            console.warn(`[HMR] No stylesheets found matching path: ${path}, refreshing ALL stylesheets as fallback`);
+            
+            // Reset the counter for the fallback approach
+            updatedCount = 0;
             
             stylesheets.forEach((stylesheet: Element) => {
                 const link = stylesheet as HTMLLinkElement;
                 const url = new URL(link.href);
+                
+                console.log(`[HMR] Refreshing (fallback): ${link.href}`);
                 
                 // Add or update the timestamp parameter for all stylesheets
                 url.searchParams.set('t', timestamp.toString());
