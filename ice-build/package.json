@@ -32,6 +32,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@n8d/ice-hotreloader": "^0.0.1-alpha.14",
     "autoprefixer": "^10.4.14",
     "chalk": "^5.2.0",
     "chokidar": "^3.5.3",
@@ -41,8 +42,7 @@
     "lodash.debounce": "^4.0.8",
     "postcss": "^8.4.24",
     "sass": "^1.62.1",
-    "sass-graph": "^4.0.1",
-    "@n8d/ice-hotreloader": "file:../ice-hotreloader"
+    "sass-graph": "^4.0.1"
   },
   "devDependencies": {
     "@types/lodash.debounce": "^4.0.7",
