@@ -27,8 +27,12 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm' # Cache npm dependencies
 
+    # Install dependencies with extra handling for potential missing deps
     - name: Install dependencies (using npm ci for workspaces)
-      run: npm ci # Installs dependencies for all workspaces
+      run: |
+        npm ci
+        # Add missing dependency for glob package
+        npm install path-scurry --no-save
 
     # Use NX for running tests across affected packages
     - name: Lint packages
@@ -40,11 +44,15 @@ jobs:
     - name: Build all packages
       run: npm run build
       
-    # Test both ice-build and ice-hotreloader integration
+    # Test both ice-build and ice-hotreloader integration with better error handling
     - name: Run Integration Tests (ice-build)
-      run: npm run test:integration --workspace=@n8d/ice-build
+      run: |
+        # Ensure all dependencies are correctly linked for integration tests
+        npm install -g path-scurry
+        npm run test:integration --workspace=@n8d/ice-build
       env:
         CI_PLATFORM: ${{ runner.os }}
+        NODE_OPTIONS: "--verbose"
         
     # Add Windows-specific path normalization tests
     - name: Verify Windows Compatibility

@@ -41,6 +41,7 @@
     "commander": "^10.0.1",
     "esbuild": "^0.18.0",
     "glob": "^10.2.6",
+    "path-scurry": "^1.9.2",
     "lodash.debounce": "^4.0.8",
     "postcss": "^8.4.24",
     "sass": "^1.62.1",
