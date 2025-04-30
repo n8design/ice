@@ -21,16 +21,20 @@ class BrowserHMR {
         });
 
         this.ws.addEventListener('message', (event) => {
-            const message = JSON.parse(event.data);
-            console.log('[HMR] Received message:', message);
+            try {
+                const message = JSON.parse(event.data);
+                console.log('[HMR] Received message:', message);
 
-            switch (message.type) {
-                case 'css':
-                    this.refreshCSS(message.path);
-                    break;
-                case 'full':
-                    location.reload();
-                    break;
+                switch (message.type) {
+                    case 'css':
+                        this.refreshCSS(message.path);
+                        break;
+                    case 'full':
+                        location.reload();
+                        break;
+                }
+            } catch (e) {
+                console.error('[HMR] Failed to parse message:', e);
             }
         });
 
@@ -54,8 +58,8 @@ class BrowserHMR {
         console.log('[HMR] Refreshing CSS for path:', path);
 
         // Query all stylesheets that match the path
-        const stylesheets = document.querySelectorAll(`link[rel="stylesheet"][href*="${path}"]`);
-        console.debug('[HMR] Query:', `link[rel="stylesheet"][href*="${path}"]`);
+        const stylesheets = document.querySelectorAll(`link[rel="stylesheet"]`);
+        console.debug('[HMR] Query:', `link[rel="stylesheet"]`);
         const timestamp = Date.now();
 
         if (stylesheets.length === 0) {
@@ -63,15 +67,26 @@ class BrowserHMR {
             return;
         }
 
+        // Count how many are updated
+        let updatedCount = 0;
+
         // Update each matching stylesheet
         stylesheets.forEach((stylesheet: Element) => {
             const link = stylesheet as HTMLLinkElement;
-            const url = link.href.split('?')[0];
-            console.log(`[HMR] Refreshing: ${url}`);
-            link.href = `${url}?t=${timestamp}`;
+            const url = new URL(link.href);
+            
+            // Only update stylesheets that actually match the path
+            if (url.pathname.includes(path)) {
+                console.log(`[HMR] Refreshing: ${link.href}`);
+                
+                // Add or update the timestamp parameter
+                url.searchParams.set('t', timestamp.toString());
+                link.href = url.toString();
+                updatedCount++;
+            }
         });
 
-        console.log(`[HMR] Refreshed ${stylesheets.length} stylesheet(s)`);
+        console.log(`[HMR] Refreshed ${updatedCount} stylesheet(s)`);
     }
 }
 

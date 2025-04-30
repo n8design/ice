@@ -11,8 +11,13 @@ function getCurrentTime(): string {
 export class HotReloadServer {
     private wss: WebSocketServer;
     private clients: Set<WebSocket> = new Set();
+    private baseOutputDir: string = 'public'; // Default output directory
     
-    constructor(port: number = 3001) {
+    constructor(port: number = 3001, options: { outputDir?: string } = {}) {
+        if (options.outputDir) {
+            this.baseOutputDir = options.outputDir.replace(/\\/g, '/').replace(/\/$/, '');
+        }
+        
         const server = createServer();
         this.wss = new WebSocketServer({ server });
         
@@ -37,10 +42,17 @@ export class HotReloadServer {
     
     // Methods like notifyClients, etc.
     notifyClients(type: string, path: string) {
-        const message = JSON.stringify({ type, path });
+        // Normalize path for URLs: convert backslashes to forward slashes
+        const normalizedPath = path.replace(/\\/g, '/');
+        
+        // Remove output directory prefix if it exists (configured dynamically)
+        const outputDirPattern = new RegExp(`^${this.baseOutputDir}/`);
+        const cleanPath = normalizedPath.replace(outputDirPattern, '');
+        
+        const message = JSON.stringify({ type, path: cleanPath });
         
         // Get the filename from the path for more concise messaging
-        const filename = path.split('/').pop() || path;
+        const filename = cleanPath.split('/').pop() || cleanPath;
         
         if (type === 'css') {
             console.log(`🔥 [${getCurrentTime()}] 📤 Refresh CSS: ${filename}`);
@@ -57,5 +69,8 @@ export class HotReloadServer {
         });
     }
     
-    // Other methods
+    // Allow updating the output directory
+    setOutputDir(dir: string): void {
+        this.baseOutputDir = dir.replace(/\\/g, '/').replace(/\/$/, '');
+    }
 }
