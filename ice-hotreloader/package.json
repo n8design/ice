@@ -1,6 +1,6 @@
 {
   "name": "@n8d/ice-hotreloader",
-  "version": "0.0.1-alpha.14",
+  "version": "0.0.1-alpha.17",
   "type": "module",
   "license": "MIT",
   "private": false,
@@ -32,7 +32,9 @@
     "build": "npm run build:node && npm run build:browser",
     "build:node": "tsc",
     "build:browser": "esbuild src/browser.ts --bundle --minify --sourcemap --outfile=dist/browser.min.js --format=iife --target=es2020",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "files": [
     "dist",
@@ -48,13 +50,15 @@
     "url": "https://github.com/n8design/ice.git"
   },
   "dependencies": {
+    "vite": "^6.3.4",
+    "vitest": "^3.1.2",
     "ws": "^8.x"
   },
   "devDependencies": {
-    "@types/ws": "^8.x",
-    "typescript": "^5.x",
     "@types/node": "^22.x",
-    "esbuild": "^0.25.x"
+    "@types/ws": "^8.x",
+    "esbuild": "^0.25.x",
+    "typescript": "^5.x"
   },
   "nx-release-publish": {
     "executor": "@nx/js:release-publish",

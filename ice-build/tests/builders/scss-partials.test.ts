@@ -17,18 +17,17 @@ vi.mock('fs/promises', () => ({
 vi.mock('fs', () => {
   return {
     existsSync: vi.fn().mockReturnValue(true),
-    readFileSync: vi.fn()
+    readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    mkdirSync: vi.fn()
   };
 });
 
-vi.mock('glob', () => ({
-  glob: vi.fn().mockResolvedValue(['style.scss', '_partial.scss', '_variables.scss']),
-  sync: vi.fn().mockReturnValue(['style.scss', '_partial.scss', '_variables.scss'])
-}));
-
+// Update sass mock to use modern API
 vi.mock('sass', () => ({
   compile: vi.fn().mockReturnValue({
-    css: 'body { color: blue; }'
+    css: 'body { color: blue; }',
+    sourceMap: 'sourcemap-content'
   })
 }));
 
