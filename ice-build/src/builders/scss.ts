@@ -6,7 +6,7 @@ import * as sass from 'sass';
 import postcss from 'postcss';
 import autoprefixer from 'autoprefixer';
 import { glob } from 'glob';
-import sassGraph from 'sass-graph';
+import enhancedSassGraph from '../utils/enhanced-sass-graph.js';
 import { Logger } from '../utils/logger.js';
 import { formatTime } from '../utils/helpers.js';
 
@@ -16,7 +16,7 @@ const logger = new Logger('SCSS');
  * Normalize paths to use forward slashes for cross-platform compatibility
  */
 function normalizePath(filepath: string): string {
-  return filepath.replace(/\\/g, '/');
+  return enhancedSassGraph.normalizePath(filepath);
 }
 
 export class SCSSBuilder implements Builder {
@@ -137,15 +137,15 @@ export class SCSSBuilder implements Builder {
         return;
       }
       
-      // Process each directory separately
+      // Process each directory separately using our enhanced sass graph
       let combinedGraph: any = null;
       
       for (const dir of directories) {
         if (!fsSync.existsSync(dir)) continue;
         
         try {
-          // Use parseDir for each directory
-          const graph = sassGraph.parseDir(dir, {
+          // Use the enhanced parseDir function
+          const graph = enhancedSassGraph.parseDir(dir, {
             loadPath: directories,
             extensions: ['scss', 'sass']
           });
@@ -162,55 +162,10 @@ export class SCSSBuilder implements Builder {
         }
       }
       
-      // Create a normalized version of the graph for cross-platform compatibility
-      const graph = combinedGraph || { index: {}, visitAncestors: () => ({}) };
-      
-      // Normalize all paths in the graph
-      if (graph && graph.index) {
-        // Define the type for the normalized index
-        const normalizedIndex: Record<string, { 
-          imports: string[], 
-          importedBy: string[] 
-        }> = {};
-        
-        Object.keys(graph.index).forEach((key: string) => {
-          // Normalize key path (replace backslashes with forward slashes)
-          const normalizedKey = normalizePath(key);
-          
-          // Copy node with normalized paths for imports and importedBy
-          normalizedIndex[normalizedKey] = {
-            imports: (graph.index[key]?.imports || []).map((p: string) => normalizePath(p)),
-            importedBy: (graph.index[key]?.importedBy || []).map((p: string) => normalizePath(p))
-          };
-        });
-        
-        // Replace the index with the normalized version
-        graph.index = normalizedIndex;
-        
-        // Wrap the visitAncestors method to handle normalized paths
-        const originalVisitAncestors = graph.visitAncestors;
-        graph.visitAncestors = (filePath: string) => {
-          // Always normalize input path
-          const normalizedPath = normalizePath(filePath);
-          
-          // Try with normalized path first
-          let result = originalVisitAncestors.call(graph, normalizedPath) || {};
-          
-          // If no results, try with original path
-          if (Object.keys(result).length === 0) {
-            const originalResult = originalVisitAncestors.call(graph, filePath) || {};
-            result = originalResult;
-          }
-          
-          return result;
-        };
-      }
-      
-      this.dependencyGraph = graph;
+      this.dependencyGraph = combinedGraph || { index: {}, visitAncestors: () => ({}) };
       
       const fileCount = this.dependencyGraph.index ? Object.keys(this.dependencyGraph.index).length : 0;
       logger.info(`Built dependency graph with ${fileCount} SCSS files`);
-
     } catch (error: any) {
       logger.error(`Failed to build dependency graph: ${error.message}`);
       // Create an empty graph to avoid null reference errors
