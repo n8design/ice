@@ -36,7 +36,6 @@
     "test": "vitest run",
     "test:integration": "echo 'Integration tests not implemented yet' && exit 0",
     "test:watch": "vitest"
-    
   },
   "files": [
     "dist",
@@ -52,7 +51,6 @@
     "url": "https://github.com/n8design/ice.git"
   },
   "dependencies": {
-    "vite": "^6.3.4",
     "vitest": "^3.1.2",
     "ws": "^8.x"
   },
