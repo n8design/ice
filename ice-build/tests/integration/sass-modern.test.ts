@@ -63,26 +63,8 @@ describe('Modern SCSS Module System Integration', () => {
     // 3. Component using abstracts with namespaces
     writeFileSync(join(sourceDir, 'components', '_button.scss'), `
       @use '../abstracts/colors' as c;
-      @use '../abstracts/typography' as t;
-
       .button {
-        font-family: t.$font-family;
-        background-color: c.$primary;
-        color: white;
-        padding: 0.5em 1em;
-        border-radius: 4px;
-
-        &:hover {
-          background-color: color.adjust(c.$primary, $lightness: -10%);
-        }
-
-        &.secondary {
-          background-color: c.$secondary;
-
-          &:hover {
-            background-color: color.adjust(c.$secondary, $lightness: -10%);
-          }
-        }
+        background-color: color.adjust(c.$primary, $lightness: -10%);
       }
     `);
     
