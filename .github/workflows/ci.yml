@@ -43,24 +43,22 @@ jobs:
       run: npm run test:integration --workspace=@n8d/ice-build
       env:
         CI_PLATFORM: ${{ runner.os }}
-        NODE_OPTIONS: "--verbose"
 
     - name: Run Integration Tests (ice-hotreloader)
       run: npm run test:integration --workspace=@n8d/ice-hotreloader
       env:
         CI_PLATFORM: ${{ runner.os }}
-        NODE_OPTIONS: "--verbose"
 
     - name: Verify Windows-Specific Path Normalization
       if: runner.os == 'Windows'
       run: |
         echo "Verifying Windows-specific path normalization..."
         cd ice-build
-        npx vitest run path-utils
+        npx vitest run path-utils --verbose
 
     - name: Verify macOS/Linux-Specific Path Handling
       if: runner.os != 'Windows'
       run: |
         echo "Verifying macOS/Linux-specific path handling..."
         cd ice-build
-        npx vitest run path-utils
+        npx vitest run path-utils --verbose
