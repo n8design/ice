@@ -1,5 +1,5 @@
 import { IceConfig, HotReloadEventType } from '../types.js';
-import chokidar from 'chokidar';
+import chokidar, { FSWatcher } from 'chokidar';
 import path from 'path';
 import { BuildManager } from '../builders/index.js';
 import { HotReloadManager } from '../hotreload/index.js';
@@ -9,7 +9,7 @@ const logger = new Logger('Watcher');
 
 export class FileWatcher {
   private config: IceConfig;
-  private watcher: chokidar.FSWatcher | null = null;
+  private watcher: FSWatcher | null = null;
   private buildManager: BuildManager;
   private hotReloadManager: HotReloadManager;
 
@@ -43,7 +43,13 @@ export class FileWatcher {
     this.watcher.on('change', filepath => this.handleChange(filepath));
     this.watcher.on('add', filepath => this.handleAdd(filepath));
     this.watcher.on('unlink', filepath => this.handleUnlink(filepath));
-    this.watcher.on('error', error => logger.error(`Watcher error: ${error.message}`));
+    this.watcher.on('error', (error) => {
+      if (error instanceof Error) {
+        logger.error(`Watcher error: ${error.message}`);
+      } else {
+        logger.error(`Watcher error: ${JSON.stringify(error)}`);
+      }
+    });
     
     logger.success('File watcher started');
   }
