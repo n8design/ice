@@ -124,10 +124,10 @@ describe('SCSS Partials and Dependency Graph', () => {
       const filePath = file.toString();
       
       if (filePath.includes('style.scss')) {
-        return '@use "./variables" as *; @use "./partial" as *; body { color: $primary; }';
+        return '@use "./variables" as *; body { color: color.adjust($primary, $lightness: -10%); }';
       }
       else if (filePath.includes('_partial.scss')) {
-        return '@use "./variables" as *; .partial { background: $secondary; }';
+        return '@use "./variables" as *; .partial { background: color.adjust($secondary, $lightness: -10%); }';
       }
       else if (filePath.includes('_variables.scss')) {
         return '$primary: blue; $secondary: green;';

@@ -38,9 +38,9 @@ describe('SCSS Dependency Graph Integration', () => {
     writeFileSync(join(sourceDir, '_mixins.scss'), 
       '@mixin rounded { border-radius: 5px; }');
     writeFileSync(join(sourceDir, '_layout.scss'), 
-      '@use "./variables" as *; .container { max-width: 1200px; color: $primary; }');
+      '@use "./variables" as *; .container { max-width: 1400px !important; color: color.adjust($primary, $lightness: -10%); padding: 2rem !important; }');
     writeFileSync(join(sourceDir, 'style.scss'), 
-      '@use "./variables" as *; @use "./layout" as *; @use "./mixins" as *; body { color: $secondary; @include rounded; }');
+      '@use "./variables" as *; @use "./layout" as *; body { color: color.adjust($secondary, $lightness: -10%); }');
     writeFileSync(join(sourceDir, 'alternate.scss'), 
       '@use "./variables" as *; .alternate { color: $tertiary; }');
     

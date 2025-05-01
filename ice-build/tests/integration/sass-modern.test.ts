@@ -64,23 +64,23 @@ describe('Modern SCSS Module System Integration', () => {
     writeFileSync(join(sourceDir, 'components', '_button.scss'), `
       @use '../abstracts/colors' as c;
       @use '../abstracts/typography' as t;
-      
+
       .button {
         font-family: t.$font-family;
         background-color: c.$primary;
         color: white;
         padding: 0.5em 1em;
         border-radius: 4px;
-        
+
         &:hover {
-          background-color: darken(c.$primary, 10%);
+          background-color: color.adjust(c.$primary, $lightness: -10%);
         }
-        
+
         &.secondary {
           background-color: c.$secondary;
-          
+
           &:hover {
-            background-color: darken(c.$secondary, 10%);
+            background-color: color.adjust(c.$secondary, $lightness: -10%);
           }
         }
       }
@@ -89,13 +89,13 @@ describe('Modern SCSS Module System Integration', () => {
     // 4. Another component using abstracts via index with * namespace
     writeFileSync(join(sourceDir, 'components', '_card.scss'), `
       @use '../abstracts' as *;
-      
+
       .card {
         font-family: $font-family;
-        border: 1px solid lighten($primary, 30%);
+        border: 1px solid color.adjust($primary, $lightness: 30%);
         border-radius: 4px;
         padding: 1rem;
-        
+
         &__title {
           @include heading;
           color: $accent;

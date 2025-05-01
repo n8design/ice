@@ -53,7 +53,6 @@ describe('ConfigManager', () => {
     expect(config.input.scss).toContain('source/**/*.scss'); // Update to look for source pattern
     
     // Updated expectation to match the actual number of calls
-    // Our new implementation checks for 3 possible config file names
     expect(fs.existsSync).toHaveBeenCalledTimes(3);
   });
 
