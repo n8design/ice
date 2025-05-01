@@ -7,16 +7,19 @@ import {
   createMockServerWebSocket 
 } from './utils/test-helpers.js';
 
-// Initialize mockConnectionCallback
-let mockConnectionCallback: Function;
+// Define explicit function type for callback
+type Callback = (...args: unknown[]) => void;
+
+// Initialize mockConnectionCallback as a `let` to allow reassignment
+let mockConnectionCallback: Callback = () => {};
 
 // Mock modules
 vi.mock('ws', () => {
   return {
     WebSocketServer: vi.fn().mockImplementation(() => ({
-      on: vi.fn((event, callback) => {
+      on: vi.fn((event, callback: Callback) => {
         if (event === 'connection') {
-          mockConnectionCallback = callback;
+          mockConnectionCallback = callback; // Ensure callback is callable
         }
       })
     })),
@@ -98,34 +101,33 @@ describe('HotReloadServer', () => {
   describe('Client management', () => {
     it('should add client on connection', () => {
       const mockWs = createMockServerWebSocket();
-      
-      // Simulate WebSocket connection by accessing the server's client set directly
-      hotReloadServer['clients'].add(mockWs as unknown as WebSocket);
-      
+
+      // Simulate WebSocket connection by invoking the connection callback
+      mockConnectionCallback(mockWs as unknown as WebSocket);
+
       expect(hotReloadServer['clients'].size).toBe(1);
     });
-    
+
     it('should remove client on close', () => {
       const mockWs = createMockServerWebSocket();
-      
-      // First manually add the WebSocket to simulate connection
-      hotReloadServer['clients'].add(mockWs as unknown as WebSocket);
+
+      // Simulate WebSocket connection
+      mockConnectionCallback(mockWs as unknown as WebSocket);
       expect(hotReloadServer['clients'].size).toBe(1);
-      
-      // Then manually remove it to simulate the close handler
+
+      // Simulate WebSocket close
       hotReloadServer['clients'].delete(mockWs as unknown as WebSocket);
-      
       expect(hotReloadServer['clients'].size).toBe(0);
     });
     
     it('should handle client error', () => {
       const mockWs = createMockServerWebSocket();
-      mockWs.close = vi.fn(); // Explicitly reset the mock
+      (mockWs as any).close = vi.fn(); // Explicitly reset the mock
       
       // Instead of trying to simulate the error handler, we'll directly test the implementation
       const errorHandler = (error: Error) => {
         console.error(`Error: ${error.message}`);
-        mockWs.close!();
+        (mockWs as any).close();
       };
       
       // Manually invoke the error handler

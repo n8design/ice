@@ -8,11 +8,14 @@ export const WS_CLOSING = 2;
 export const WS_CLOSED = 3;
 
 // Use a more generic type for mocks
-type MockFunction = any;
+type MockFunction = unknown;
+
+// Replace `Function` with explicit function types
+type GenericFunction = (...args: unknown[]) => void;
 
 // Mock WebSocket interface for server tests
 export interface MockServerWebSocket {
-  on: (event: string, handler: Function) => any;
+  on: (event: string, handler: GenericFunction) => unknown;
   send: MockFunction;
   readyState: 0 | 1 | 2 | 3;
   close?: MockFunction;
@@ -22,8 +25,8 @@ export interface MockServerWebSocket {
 
 // Create a mock WebSocket for server tests
 export function createMockServerWebSocket(): MockServerWebSocket {
-  const closeHandlers: Function[] = [];
-  const errorHandlers: Function[] = [];
+  const closeHandlers: GenericFunction[] = [];
+  const errorHandlers: GenericFunction[] = [];
   
   const mockWs: MockServerWebSocket = {
     on: vi.fn((event, handler) => {
@@ -50,13 +53,13 @@ export function createMockServerWebSocket(): MockServerWebSocket {
 export interface MockBrowserWebSocket {
   addEventListener: MockFunction;
   readyState: 0 | 1 | 2 | 3;
-  _listeners: Record<string, Function[]>;
-  _triggerEvent: (eventName: string, data: any) => void;
+  _listeners: Record<string, GenericFunction[]>;
+  _triggerEvent: (eventName: string, data: unknown) => void;
 }
 
 // Create a mock WebSocket for browser tests
 export function createMockBrowserWebSocket(): MockBrowserWebSocket {
-  const listeners: Record<string, Function[]> = {
+  const listeners: Record<string, GenericFunction[]> = {
     'open': [],
     'message': [],
     'close': [],
@@ -124,3 +127,12 @@ export function setupMockDOM() {
     mockWebSocketInstance
   };
 }
+
+// Replace `any` with `unknown` or specific types
+const helperFunction = (arg: unknown): void => {
+  // Implementation here
+};
+
+const anotherHelper: GenericFunction = () => {
+  // Implementation here
+};
