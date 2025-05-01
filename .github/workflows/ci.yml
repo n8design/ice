@@ -29,11 +29,12 @@ jobs:
 
     - name: Remove all package-lock.json files
       run: |
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          for /r %i in (package-lock.json) do del "%i" 2>nul || echo "No package-lock.json found"
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          find . -name "package-lock.json" -type f -exec del {} +
         else
           find . -name "package-lock.json" -type f -exec rm -f {} +
         fi
+      shell: bash
 
     - name: Install dependencies
       run: npm install
@@ -67,16 +68,3 @@ jobs:
       env:
         CI_PLATFORM: ${{ runner.os }}
 
-    # - name: Verify Windows-Specific Path Normalization
-    #   if: runner.os == 'Windows'
-    #   run: |
-    #     echo "Verifying Windows-specific path normalization..."
-    #     cd ice-build
-    #     npx vitest run path-utils
-
-    # - name: Verify macOS/Linux-Specific Path Handling
-    #   if: runner.os != 'Windows'
-    #   run: |
-    #     echo "Verifying macOS/Linux-specific path handling..."
-    #     cd ice-build
-    #     npx vitest run path-utils
