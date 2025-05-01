@@ -2,7 +2,7 @@ name: Ice Build CI
 
 on:
   push:
-    branches: [ main, winfix ] # Adjust branches as needed
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        node-version: [20.x] # Test against Node 20
+        node-version: [22.x, 20.x] # Test against Node.js versions
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
@@ -27,37 +27,40 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm' # Cache npm dependencies
 
-    # Install dependencies with extra handling for potential missing deps
-    - name: Install dependencies (using npm ci for workspaces)
-      run: |
-        npm ci
-        # Add missing dependency for glob package
-        npm install path-scurry --no-save
+    - name: Install dependencies
+      run: npm ci
 
-    # Use NX for running tests across affected packages
     - name: Lint packages
       run: npx nx affected --target=lint
-      
-    - name: Run Unit Tests (all workspaces)
+
+    - name: Run Unit Tests
       run: npx nx affected --target=test
-      
+
     - name: Build all packages
       run: npm run build
-      
-    # Test both ice-build and ice-hotreloader integration with better error handling
+
     - name: Run Integration Tests (ice-build)
-      run: |
-        # Ensure all dependencies are correctly linked for integration tests
-        npm install -g path-scurry
-        npm run test:integration --workspace=@n8d/ice-build
+      run: npm run test:integration --workspace=@n8d/ice-build
       env:
         CI_PLATFORM: ${{ runner.os }}
         NODE_OPTIONS: "--verbose"
-        
-    # Add Windows-specific path normalization tests
-    - name: Verify Windows Compatibility
+
+    - name: Run Integration Tests (ice-hotreloader)
+      run: npm run test:integration --workspace=@n8d/ice-hotreloader
+      env:
+        CI_PLATFORM: ${{ runner.os }}
+        NODE_OPTIONS: "--verbose"
+
+    - name: Verify Windows-Specific Path Normalization
       if: runner.os == 'Windows'
       run: |
         echo "Verifying Windows-specific path normalization..."
+        cd ice-build
+        npx vitest run path-utils
+
+    - name: Verify macOS/Linux-Specific Path Handling
+      if: runner.os != 'Windows'
+      run: |
+        echo "Verifying macOS/Linux-specific path handling..."
         cd ice-build
         npx vitest run path-utils
