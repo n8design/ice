@@ -54,11 +54,11 @@ jobs:
       run: |
         echo "Verifying Windows-specific path normalization..."
         cd ice-build
-        npx vitest run path-utils --verbose
+        npx vitest run path-utils
 
     - name: Verify macOS/Linux-Specific Path Handling
       if: runner.os != 'Windows'
       run: |
         echo "Verifying macOS/Linux-specific path handling..."
         cd ice-build
-        npx vitest run path-utils --verbose
+        npx vitest run path-utils
