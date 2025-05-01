@@ -172,3 +172,4 @@ tsconfig.tsbuildinfo
 
 # Nx
 .nx/
+.vscode/mcp.json
