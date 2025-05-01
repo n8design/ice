@@ -27,8 +27,13 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm' # Cache npm dependencies
 
-    - name: Remove package-lock.json
-      run: rm -rf *package-lock.json*
+    - name: Remove all package-lock.json files
+      run: |
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          for /r %i in (package-lock.json) do del "%i" 2>nul || echo "No package-lock.json found"
+        else
+          find . -name "package-lock.json" -type f -exec rm -f {} +
+        fi
 
     - name: Install dependencies
       run: npm install
