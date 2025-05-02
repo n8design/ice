@@ -24,9 +24,10 @@ try {
   // Create tag name
   const tagName = `${packageName}@${version}`;
   
-  // Determine if this is an alpha release
-  const isAlpha = version.includes('alpha');
-  const releaseType = isAlpha ? 'alpha' : 'release';
+  // Determine if this is an alpha/beta/prerelease
+  const isPrerelease = version.includes('-');
+  const npmTag = isPrerelease ? "alpha" : "latest";
+  const releaseType = isPrerelease ? "alpha" : "release";
   
   console.log(`Finalizing ${releaseType} for ${packageName} version ${version}`);
   
@@ -41,9 +42,9 @@ try {
   console.log('Creating tag...');
   execSync(`git tag -f ${tagName}`, { stdio: 'inherit' });
   
-  // Add npm publish step
-  console.log('Publishing to npm registry...');
-  execSync(`cd ${packageName} && npm publish`, { stdio: 'inherit' });
+  // Add npm publish step - now with appropriate tag
+  console.log(`Publishing to npm registry with tag '${npmTag}'...`);
+  execSync(`cd ${packageName} && npm publish --tag ${npmTag}`, { stdio: 'inherit' });
   
   // Push changes and tags
   console.log('Pushing to remote...');
