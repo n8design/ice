@@ -85,6 +85,10 @@
     "semantic-release-monorepo": "^8.0.2",
     "typescript-eslint": "^8.31.1"
   },
+  "peerDependencies": {
+    "eslint": "^8.57.0",
+    "@rushstack/eslint-config": "^4.3.0"
+  },
   "resolutions": {
     "eslint": "^8.57.0"
   }
