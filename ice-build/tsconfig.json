@@ -4,6 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src",
@@ -12,7 +13,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     // Add the types property to include estree
-    "types": ["vitest/globals", "node", "estree"]
+    "types": ["vitest/globals", "node", "estree", "@types/lodash.debounce"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]

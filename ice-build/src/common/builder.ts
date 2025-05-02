@@ -2,7 +2,7 @@
  * Base Builder class
  */
 import { EventEmitter } from 'events';
-import { IceConfig } from '../interfaces/config.js';
+import { IceConfig } from '../types.js'; // Updated import path
 
 export class Builder extends EventEmitter {
   protected config: IceConfig;

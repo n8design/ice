@@ -1,8 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { defaultConfig } from './defaults.js';
-import { IceConfig } from '../types.js';
+import { IceConfig, defaultConfig } from '../types.js';
 import { Logger } from '../utils/logger.js';
 import { pathToFileURL } from 'url';
 
@@ -14,7 +13,13 @@ export class ConfigManager {
 
   constructor(configPath?: string) {
     // Initialize with default config and then try to load custom config
-    this.config = { ...defaultConfig };
+    this.config = {
+      input: {
+        ts: [],
+        scss: [],
+      },
+      ...defaultConfig
+    } as IceConfig;
     
     try {
       // Non-async initialization - for constructor

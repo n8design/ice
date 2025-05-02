@@ -1,225 +1,226 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SCSSBuilder } from '../../src/builders/scss.js';
+import { describe, it, expect, beforeEach, afterEach, vi, test, MockInstance } from 'vitest'; // Add test, MockInstance
 import path from 'path';
-import * as fsSync from 'fs';
+import os from 'os';
+import * as fs from 'fs'; // Import for types and minimal sync mock
+import * as fsPromises from 'fs/promises'; // Import actual promises API
+import { SCSSBuilder } from '../../src/builders/scss.js'; // Import the class
+import { IceConfig } from '../../src/types';
+import * as globModule from 'glob'; // Import glob module
+import { Mock } from 'vitest'; // Import Mock type
+import * as loggerModule from '../../src/utils/logger.js'; // Import the module itself
 
-// Mock dependencies
-vi.mock('fs/promises', () => ({
-  default: {
-    mkdir: vi.fn().mockResolvedValue(undefined),
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    unlink: vi.fn().mockResolvedValue(undefined),
-    access: vi.fn().mockResolvedValue(undefined)
-  }
-}));
-
-// Fix the fs module mock
-vi.mock('fs', () => {
+// --- Minimal fs Mock (Sync methods for setup/teardown) ---
+const mockFsExistsStorePartials: { [key: string]: boolean } = {};
+vi.mock('fs', async (importActual) => {
+  const actualFs = await importActual<typeof import('fs')>();
+  const pathModule = await import('path');
+  const normalizeMockPath = (p: string) => pathModule.normalize(p).replace(/\\/g, '/');
+  let tempDirCounter = 0;
   return {
-    existsSync: vi.fn().mockReturnValue(true),
-    readFileSync: vi.fn(),
-    writeFileSync: vi.fn(),
-    mkdirSync: vi.fn()
+    ...actualFs,
+    existsSync: vi.fn((p: fs.PathLike) => mockFsExistsStorePartials[normalizeMockPath(p.toString())] ?? false),
+    mkdtempSync: vi.fn((prefix: string) => {
+      const tempDir = pathModule.join(os.tmpdir(), `mock-partials-temp-${Date.now()}-${tempDirCounter++}`);
+      mockFsExistsStorePartials[normalizeMockPath(tempDir)] = true;
+      return tempDir;
+    }),
+    rmSync: vi.fn((p: fs.PathLike, opts) => {
+      const normalized = normalizeMockPath(p.toString());
+      delete mockFsExistsStorePartials[normalized];
+      if (opts?.recursive) { /* ... */ }
+    }),
   };
 });
 
-// Update sass mock to use modern API
-vi.mock('sass', () => ({
-  compile: vi.fn().mockReturnValue({
-    css: 'body { color: blue; }',
-    sourceMap: 'sourcemap-content'
-  })
-}));
+// --- Remove fs/promises mock factory ---
 
-vi.mock('postcss', () => ({
-  default: vi.fn().mockReturnValue({
-    process: vi.fn().mockResolvedValue({
-      css: 'body { color: blue; }',
-      map: {
-        toString: vi.fn().mockReturnValue('sourcemap-content')
-      }
-    })
-  })
-}));
+// --- Mock glob ---
+vi.mock('glob');
 
-vi.mock('autoprefixer', () => ({
-  default: vi.fn().mockReturnValue({})
-}));
-
-// Fix the sass-graph mock to properly return the expected structure
-vi.mock('sass-graph', () => {
+// --- Logger Mock Setup ---
+// Define everything inside the factory
+vi.mock('../../src/utils/logger.js', () => {
+  const mockFns = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+    debug: vi.fn(),
+  };
   return {
-    default: {
-      parseDir: vi.fn().mockReturnValue({
-        index: {
-          '/source/_variables.scss': {
-            imports: [],
-            importedBy: ['/source/style.scss', '/source/_partial.scss']
-          },
-          '/source/_partial.scss': {
-            imports: ['/source/_variables.scss'],
-            importedBy: ['/source/style.scss']
-          },
-          '/source/style.scss': {
-            imports: ['/source/_variables.scss', '/source/_partial.scss'],
-            importedBy: []
-          },
-          // Add windows-style path for cross-platform test
-          'C:/source/_variables.scss': {
-            imports: [],
-            importedBy: ['/source/style.scss']
-          }
-        },
-        visitAncestors: function(file) {
-          const normalizedFile = file.toLowerCase().replace(/\\/g, '/');
-          
-          const result = {};
-          if (normalizedFile.includes('_variables')) {
-            result['/source/style.scss'] = true;
-          } else if (normalizedFile.includes('_partial')) {
-            result['/source/style.scss'] = true;
-          }
-          return result;
-        }
-      })
+    // Export the mock functions for later access
+    __mockLoggerFns: mockFns,
+    Logger: class {
+      info = mockFns.info;
+      warn = mockFns.warn;
+      error = mockFns.error;
+      success = mockFns.success;
+      debug = mockFns.debug;
     }
   };
 });
 
-vi.mock('../../src/utils/logger.js', () => ({
-  Logger: class {
-    info() {}
-    warn() {}
-    error() {}
-    success() {}
-    debug() {}
-  }
-}));
+// --- Define paths needed for graph mock at top level ---
+let variablesPath: string, partialPath: string, buttonPath: string, stylePath: string, themePath: string, windowsPath: string;
 
 describe('SCSS Partials and Dependency Graph', () => {
-  const mockConfig = {
-    input: {
-      scss: ['source/**/*.scss'],
-      ts: ['source/**/*.ts'],
-      html: ['source/**/*.html']
-    },
-    output: { path: 'public' },
-    watch: { paths: ['source'], ignored: ['node_modules'] },
-    sass: { style: 'expanded', sourceMap: true },
-    postcss: { plugins: [] },
-    hotreload: { port: 3001, debounceTime: 300 },
-    esbuild: { bundle: true, minify: false, sourcemap: true, target: 'es2018' }
-  };
-  
-  let scssBuilder;
-  
-  beforeEach(() => {
-    // Reset all mocks before each test
-    vi.clearAllMocks();
-    
-    scssBuilder = new SCSSBuilder(mockConfig, 'public');
-    
-    // Setup mock for readFileSync with correct mocking pattern
-    const readFileSyncMock = vi.fn((file: any) => {
-      const filePath = file.toString();
-      
-      if (filePath.includes('style.scss')) {
-        return '@use "./variables" as *; body { color: color.adjust($primary, $lightness: -10%); }';
-      }
-      else if (filePath.includes('_partial.scss')) {
-        return '@use "./variables" as *; .partial { background: color.adjust($secondary, $lightness: -10%); }';
-      }
-      else if (filePath.includes('_variables.scss')) {
-        return '$primary: blue; $secondary: green;';
-      }
-      
-      return '';
-    });
-    
-    // Correct way to mock the fs module's readFileSync function
-    vi.mocked(fsSync.readFileSync).mockImplementation(readFileSyncMock);
-    
-    // Important: Set up the dependency graph explicitly 
-    // This is required because SCSSBuilder caches the graph
-    scssBuilder['dependencyGraph'] = {
-      index: {
-        '/source/_variables.scss': {
-          imports: [],
-          importedBy: ['/source/style.scss', '/source/_partial.scss']
-        },
-        '/source/_partial.scss': {
-          imports: ['/source/_variables.scss'],
-          importedBy: ['/source/style.scss']
-        },
-        '/source/style.scss': {
-          imports: ['/source/_variables.scss', '/source/_partial.scss'],
-          importedBy: []
-        },
-        'C:/source/_variables.scss': {
-          imports: [],
-          importedBy: ['/source/style.scss']
-        }
-      },
-      visitAncestors: function(file) {
-        const normalizedFile = file.toLowerCase().replace(/\\/g, '/');
-        
-        const result = {};
-        if (normalizedFile.includes('_variables')) {
-          result['/source/style.scss'] = true;
-        } else if (normalizedFile.includes('_partial')) {
-          result['/source/style.scss'] = true;
-        }
-        return result;
-      }
+  let scssBuilder: SCSSBuilder;
+  let tempDir: string;
+  let mockConfig: any;
+  let processScssFileSpy: MockInstance<any>; // Use any for simplicity
+
+  beforeEach(async () => {
+    // Reset mocks FIRST
+    vi.resetAllMocks();
+    const mockedLoggerModule = loggerModule as any; // Cast to access exported mock
+    if (mockedLoggerModule.__mockLoggerFns) {
+        Object.values(mockedLoggerModule.__mockLoggerFns).forEach((mockFn: any) => mockFn.mockClear());
+    }
+    Object.keys(mockFsExistsStorePartials).forEach(key => delete mockFsExistsStorePartials[key]);
+
+    const fsSync = await import('fs');
+    tempDir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'ice-scss-test-partials-'));
+
+    const sourceDir = path.join(tempDir, 'source');
+    const publicDir = path.join(tempDir, 'public');
+    const componentsDir = path.join(sourceDir, 'components');
+
+    // Assign paths
+    variablesPath = path.join(sourceDir, '_variables.scss');
+    partialPath = path.join(sourceDir, '_partial.scss');
+    buttonPath = path.join(componentsDir, '_button.scss');
+    stylePath = path.join(sourceDir, 'style.scss');
+    themePath = path.join(sourceDir, 'theme.scss');
+    windowsPath = path.join(sourceDir, 'components\\_button.scss'); // For cross-platform test
+
+    mockConfig = {
+      input: { scss: [sourceDir], ts: [] },
+      output: { path: publicDir },
+      watch: { paths: [sourceDir], ignored: [] },
     };
-    
-    // Also directly mock the buildDependencyGraph method to avoid it being called
-    vi.spyOn(scssBuilder, 'buildDependencyGraph' as any).mockImplementation(() => {
-      // Do nothing - we already set the dependency graph above
-    });
+    // Instantiating the builder
+    scssBuilder = new SCSSBuilder(mockConfig);
+
+    // --- Manually Set Dependency Graph (AFTER instantiation) ---
+    const builderAny = scssBuilder as any;
+    const normalizeInstancePath = (p: string) => builderAny.normalizePath(p); // Use instance method
+
+    const normStyle = normalizeInstancePath(stylePath);
+    const normTheme = normalizeInstancePath(themePath);
+    const normPartial = normalizeInstancePath(partialPath);
+    const normVariables = normalizeInstancePath(variablesPath);
+    const normButton = normalizeInstancePath(buttonPath);
+
+    // Build the reverse graph first
+    const tempReverseGraph = new Map<string, Set<string>>([
+        [normPartial, new Set<string>([normStyle])],
+        [normButton, new Set<string>([normStyle])],
+        [normVariables, new Set<string>([normTheme, normPartial])],
+        // Ensure all nodes exist as keys
+        [normStyle, new Set<string>()],
+        [normTheme, new Set<string>()],
+    ]);
+    builderAny.reverseDependencyGraph = tempReverseGraph; // Assign if needed
+
+    // Build the main graph with the correct structure
+    builderAny.dependencyGraph = new Map<string, { importers: Set<string>, dependencies: Set<string> }>([
+      [normStyle, {
+        importers: tempReverseGraph.get(normStyle) || new Set<string>(),
+        dependencies: new Set<string>([normPartial, normButton])
+      }],
+      [normTheme, {
+        importers: tempReverseGraph.get(normTheme) || new Set<string>(),
+        dependencies: new Set<string>([normVariables])
+      }],
+      [normPartial, {
+        importers: tempReverseGraph.get(normPartial) || new Set<string>(),
+        dependencies: new Set<string>([normVariables])
+      }],
+      [normButton, {
+        importers: tempReverseGraph.get(normButton) || new Set<string>(),
+        dependencies: new Set<string>()
+      }],
+      [normVariables, {
+        importers: tempReverseGraph.get(normVariables) || new Set<string>(),
+        dependencies: new Set<string>()
+      }],
+    ]);
+
+    // --- Verification Step (Debug) ---
+    // console.log('Partials beforeEach - Dependency Graph Set:', builderAny.dependencyGraph);
+    // console.log('Partials beforeEach - Reverse Dependency Graph Set:', builderAny.reverseDependencyGraph);
+
+    // --- Spy on processScssFile ---
+    processScssFileSpy = vi.spyOn(scssBuilder as any, 'processScssFile').mockResolvedValue(undefined);
   });
 
-  it('should correctly identify parent files of partials', async () => {
-    // Test the getParentFiles method
-    const parentFiles = await scssBuilder.getParentFiles('/source/_variables.scss');
-    expect(parentFiles).toContain('/source/style.scss');
-    // Partial files shouldn't be included in parent files
-    expect(parentFiles).not.toContain('/source/_partial.scss');
+  afterEach(async () => {
+    const fsSync = await import('fs');
+    if (tempDir && fsSync.existsSync(tempDir)) {
+      fsSync.rmSync(tempDir, { recursive: true, force: true });
+    }
+    vi.restoreAllMocks();
   });
 
-  it('should process partials and rebuild dependent files', async () => {
-    // Mock processScssFile to track calls
-    const processScssFileSpy = vi.spyOn(scssBuilder, 'processScssFile' as any)
-      .mockImplementation((filePath) => Promise.resolve()); // Add implementation that accepts an argument
-    
-    // Process a partial file
-    await scssBuilder.buildFile('/source/_variables.scss');
-    
-    // Should process the main file that depends on the partial
-    expect(processScssFileSpy).toHaveBeenCalledWith('/source/style.scss');
-    // Shouldn't process other partials
-    expect(processScssFileSpy).not.toHaveBeenCalledWith('/source/_partial.scss');
-  });
-  
-  it('should handle cross-platform path formats', async () => {
-    // Test with Windows-style paths
-    const windowsPath = 'C:\\source\\_variables.scss';
-    const parentFiles = await scssBuilder.getParentFiles(windowsPath);
-    
-    expect(parentFiles.length).toBeGreaterThan(0);
-    // Should still find the parent files despite different path format
-    expect(parentFiles[0].replace(/\\/g, '/')).toContain('/source/style.scss');
+  test('should correctly identify parent files of partials', async () => {
+    const normalize = (p: string) => scssBuilder['normalizePath'](p);
+    const expectedStyleParent = normalize(stylePath);
+    const expectedThemeParent = normalize(themePath);
+
+    // Act - Use the manually populated graph
+    const partialParents = scssBuilder.getParentFiles(partialPath);
+    const variableParents = scssBuilder.getParentFiles(variablesPath);
+
+    // Assert
+    const mockedLoggerModule = loggerModule as any;
+    expect(mockedLoggerModule.__mockLoggerFns.warn).not.toHaveBeenCalled();
+    expect(partialParents.map(normalize)).toContain(expectedStyleParent);
+    expect(partialParents.length).toBe(1);
+
+    expect(variableParents.map(normalize)).toContain(expectedStyleParent); // Via partial
+    expect(variableParents.map(normalize)).toContain(expectedThemeParent); // Direct
+    expect(variableParents.length).toBe(2); // Should be theme & style (via partial)
   });
 
-  it('should rebuild transitive dependencies', async () => {
-    // Mock processScssFile to track calls
-    const processScssFileSpy = vi.spyOn(scssBuilder, 'processScssFile' as any)
-      .mockImplementation((filePath) => Promise.resolve()); // Add implementation that accepts an argument
-    
-    // Process a partial that's imported by another partial
-    await scssBuilder.buildFile('/source/_variables.scss');
-    
-    // Should process the main file that depends on it (even through another partial)
-    expect(processScssFileSpy).toHaveBeenCalledWith('/source/style.scss');
+  test('should process partials and rebuild dependent files', async () => {
+    const expectedStyleParent = scssBuilder['normalizePath'](stylePath);
+
+    // Act - Directly call the method that uses the graph
+    await (scssBuilder as any).processPartial(partialPath);
+
+    // Assert - Check if the spy was called based on the graph
+    const mockedLoggerModule = loggerModule as any;
+    expect(mockedLoggerModule.__mockLoggerFns.error).not.toHaveBeenCalled();
+    expect(processScssFileSpy).toHaveBeenCalledWith(expectedStyleParent);
+    expect(processScssFileSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test('should handle cross-platform path formats', async () => {
+     const normalize = (p: string) => scssBuilder['normalizePath'](p);
+     const expectedStyleParent = normalize(stylePath);
+
+     // Act - getParentFiles normalizes input, uses normalized graph keys
+     const parentFiles = scssBuilder.getParentFiles(windowsPath); // Input is windowsPath
+
+     // Assert - Should find style.scss as parent of components/_button.scss
+     const mockedLoggerModule = loggerModule as any;
+     expect(mockedLoggerModule.__mockLoggerFns.warn).not.toHaveBeenCalled();
+     expect(parentFiles.length).toBeGreaterThan(0);
+     expect(parentFiles).toContain(expectedStyleParent);
+  });
+
+  test('should rebuild transitive dependencies', async () => {
+    const expectedStyleParent = scssBuilder['normalizePath'](stylePath);
+    const expectedThemeParent = scssBuilder['normalizePath'](themePath);
+
+    // Act - Process the base dependency (_variables)
+    await (scssBuilder as any).processPartial(variablesPath);
+
+    // Assert - Check spies for ALL dependents (direct and transitive)
+    const mockedLoggerModule = loggerModule as any;
+    expect(mockedLoggerModule.__mockLoggerFns.error).not.toHaveBeenCalled();
+    expect(processScssFileSpy).toHaveBeenCalledWith(expectedStyleParent); // style -> partial -> variables
+    expect(processScssFileSpy).toHaveBeenCalledWith(expectedThemeParent); // theme -> variables
+    expect(processScssFileSpy).toHaveBeenCalledTimes(2); // Style and Theme
   });
 });

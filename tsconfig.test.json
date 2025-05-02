@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "allowJs": true,
+    "checkJs": true,
+    "declaration": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "*": ["*", "*.js"]
+    },
+    "types": ["vitest/globals", "node"]
+  },
+  "include": [
+    "scripts/tests/**/*.ts",
+    "tools/nx-plugin/tests/**/*.ts",
+    "scripts/*.js",
+    "tools/nx-plugin/*.js"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

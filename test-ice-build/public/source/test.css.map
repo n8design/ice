@@ -1,1 +1,0 @@
-{"version":3,"sources":["../../source/test.scss"],"names":[],"mappings":"AAAA;EACE,gBAAgB;EAChB,sBAAsB;AACxB","file":"test.css","sourcesContent":["body {\n  content: \"Is ok\";\n  background-color: lime;\n}"]}

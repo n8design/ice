@@ -1,6 +1,6 @@
 import { IceConfig } from '../types.js';
 
-export const defaultConfig: IceConfig = {
+export const defaultConfig: Partial<IceConfig> = {
   input: {
     ts: ['source/**/*.ts', 'source/**/*.tsx', 'src/**/*.ts', 'src/**/*.tsx'],
     scss: ['source/**/*.scss', 'source/**/*.sass', 'src/**/*.scss', 'src/**/*.sass'],
@@ -14,8 +14,8 @@ export const defaultConfig: IceConfig = {
     ignored: ['node_modules', '.git', 'public', 'dist']
   },
   hotreload: {
-    port: 3001,
-    debounceTime: 300
+    port: 3000,
+    debounceTime: 300, // Default 300ms debounce time
   },
   esbuild: {
     bundle: true,

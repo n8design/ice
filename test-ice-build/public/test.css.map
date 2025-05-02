@@ -1,1 +1,0 @@
-{"version":3,"sources":["../source/test.scss"],"names":[],"mappings":"AAAA;EACE,kCAAkC;EAClC,6BAA6B;EAC7B,sBAAsB;AACxB","file":"test.css","sourcesContent":["body {\n  content: \"Is ok - Yes pretty much\";\n  content: \"It was pretty nice\";\n  background-color: lime;\n}"]}

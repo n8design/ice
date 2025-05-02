@@ -14,12 +14,11 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "version": "0.0.4-alpha.68",
+  "version": "0.0.4-alpha.70",
   "bin": {
-    "ice-build": "./bin/ice-build.js"
+    "ice-build": "./dist/bin/ice-build.js"
   },
   "files": [
-    "bin",
     "dist",
     "assets"
   ],
@@ -42,15 +41,14 @@
     "esbuild": "^0.25.3",
     "glob": "^11.0.2",
     "lodash.debounce": "^4.0.8",
+    "path-scurry": "^2.0.0",
     "postcss": "^8.5.3",
-    "sass": "^1.87.0",
-    "sass-graph": "^4.0.1"
+    "sass": "^1.87.0"
   },
   "devDependencies": {
     "@types/estree": "^1.0.7",
-    "@types/lodash.debounce": "^4.0.9",
+    "@types/lodash.debounce": "^4.0.6",
     "@types/node": "^22.15.3",
-    "@types/sass-graph": "^2.1.7",
     "typescript": "^5.8.3",
     "vitest": "^3.1.2"
   },
@@ -62,6 +60,9 @@
   "vitest": {
     "globals": true,
     "environment": "node",
+    "setupFiles": [
+      "./vitest.setup.js"
+    ],
     "coverage": {
       "provider": "v8",
       "reporter": [

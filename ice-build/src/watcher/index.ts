@@ -4,6 +4,7 @@ import path from 'path';
 import { BuildManager } from '../builders/index.js';
 import { HotReloadManager } from '../hotreload/index.js';
 import { Logger } from '../utils/logger.js';
+import debounce from 'lodash.debounce';
 
 const logger = new Logger('Watcher');
 
@@ -12,6 +13,8 @@ export class FileWatcher {
   private watcher: FSWatcher | null = null;
   private buildManager: BuildManager;
   private hotReloadManager: HotReloadManager;
+  // Add property for debounced function
+  private debouncedProcessBuildFile;
 
   constructor(
     config: IceConfig, 
@@ -21,6 +24,10 @@ export class FileWatcher {
     this.config = config;
     this.buildManager = buildManager;
     this.hotReloadManager = hotReloadManager;
+    
+    // Initialize debounced function
+    const debounceTime = this.config.hotreload?.debounceTime ?? 300; // Use config or default
+    this.debouncedProcessBuildFile = debounce(this.processBuildFile.bind(this), debounceTime);
   }
 
   async start(): Promise<void> {
@@ -63,12 +70,12 @@ export class FileWatcher {
 
   private async handleChange(filepath: string): Promise<void> {
     logger.info(`File changed: ${filepath}`);
-    await this.processBuildFile(filepath);
+    await this.debouncedProcessBuildFile(filepath);
   }
 
   private async handleAdd(filepath: string): Promise<void> {
     logger.info(`File added: ${filepath}`);
-    await this.processBuildFile(filepath);
+    await this.debouncedProcessBuildFile(filepath);
   }
 
   private async handleUnlink(filepath: string): Promise<void> {

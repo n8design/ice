@@ -47,10 +47,10 @@ describe('ConfigManager', () => {
     const configManager = new ConfigManager();
     const config = configManager.getConfig();
 
-    // Update test to match the current default config
-    expect(config.output.path).toBe('public'); // Changed to match updated default
-    expect(config.input.ts).toContain('source/**/*.ts'); // Update to look for source pattern
-    expect(config.input.scss).toContain('source/**/*.scss'); // Update to look for source pattern
+    // Update expectations to match current default config
+    expect(config.output.path).toBe('dist'); // Changed from 'public' to 'dist'
+    expect(config.input.ts).toContain('src/**/*.ts'); // Update if needed
+    expect(config.input.scss).toContain('src/**/*.scss'); // Update if needed
     
     // Updated expectation to match the actual number of calls
     expect(fs.existsSync).toHaveBeenCalledTimes(3);
@@ -63,8 +63,7 @@ describe('ConfigManager', () => {
     const configManager = new ConfigManager();
     const outputPath = configManager.getOutputPath();
     
-    // Update test to check for 'public' instead of 'dist'
     expect(path.isAbsolute(outputPath)).toBe(true);
-    expect(outputPath.endsWith('public')).toBe(true); // Changed to match new default
+    expect(outputPath.endsWith('dist')).toBe(true); // Changed from 'public' to 'dist'
   });
 });

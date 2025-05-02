@@ -4,13 +4,15 @@
  */
 
 import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'fs'; // Keep for sync methods used ONLY in constructor or sync helpers like buildFileSync
+import { promises as fsPromises } from 'fs'; // Use fsPromises for async operations
 import * as sass from 'sass';
 import autoprefixer from 'autoprefixer';
 import postcss from 'postcss';
-import { glob } from 'glob';
-import { Builder as BuilderBase } from '../common/builder.js';
-import { IceConfig } from '../interfaces/config.js';
+import { glob } from 'glob'; // Re-import glob for the clean method
+import { EventEmitter } from 'events';
+import { Builder } from '../types.js'; // Import the correct Builder type
+import { IceConfig } from '../types.js';
 import { Logger } from '../utils/logger.js';
 
 // Create logger instance
@@ -20,31 +22,17 @@ const logger = new Logger('scss');
  * Represents a dependency relationship between SCSS files
  */
 interface SassDependency {
-  file: string;
-  imports: string[];
-  importedBy: string[];
-}
-
-/**
- * Format expected by tests - with index property
- */
-interface LegacyDependencyGraph {
-  index: {
-    [key: string]: {
-      imports: string[];
-      importedBy: string[];
-    };
-  };
-  visitAncestors: (file: string, callback: (file: string, node: any) => void) => void;
+  importers: Set<string>;
+  uses: Set<string>;
 }
 
 /**
  * SCSS Builder class 
  * Handles compilation of SCSS files and dependency tracking
  */
-export class SCSSBuilder extends BuilderBase {
-  // Changed to support both formats - our implementation uses a Map but tests expect an object with index
-  private dependencyGraph: Map<string, SassDependency> | LegacyDependencyGraph;
+export class SCSSBuilder extends EventEmitter implements Builder {
+  public readonly config: IceConfig; // Declare config property
+  private dependencyGraph: Map<string, SassDependency>;
   private outputDir: string;
 
   /**
@@ -53,8 +41,9 @@ export class SCSSBuilder extends BuilderBase {
    * @param outputDir Optional output directory override
    */
   constructor(config: IceConfig, outputDir?: string) {
-    super(config);
-    
+    super();
+    this.config = config; // Assign config property
+
     // Handle different output configurations
     if (outputDir) {
       this.outputDir = outputDir;
@@ -84,37 +73,43 @@ export class SCSSBuilder extends BuilderBase {
    */
   public async build(): Promise<void> {
     logger.info('Building all SCSS files');
-    const sourceDir = this.getSourceDir();
-    
-    try {
-      // Build dependency graph first to understand relationships
-      await this.buildDependencyGraph();
-      
-      // Find all non-partial SCSS files
-      const scssFiles = await glob(`${sourceDir}/**/*.{scss,sass}`);
-      const mainFiles = scssFiles.filter(file => !path.basename(file).startsWith('_'));
-      
-      logger.info(`Found ${mainFiles.length} main SCSS files to build: ${mainFiles.join(', ')}`);
-      
-      // Process each main file
-      for (const file of mainFiles) {
-        await this.buildFile(file);
-        // For integration tests: ensure file exists after building
-        const outputPath = this.getOutputPath(file);
-        if (!fs.existsSync(outputPath)) {
-          logger.warn(`Output not found at ${outputPath}, creating fallback`);
-          this.createFallbackCss(file, outputPath);
-        }
-      }
-      
-      logger.info('SCSS build complete');
-    } catch (error) {
-      logger.error(`Error building SCSS files: ${error}`);
-      // Don't let errors stop test runs
-      if (process.env.NODE_ENV === 'test') {
-        this.createTestOutputFiles(sourceDir);
+    const sourceDirs = this.config.input.scss;
+    let mainFiles: string[] = []; 
+
+    for (const dir of sourceDirs) {
+      logger.debug(`[BUILD DEBUG] Reading directory using fs.readdirSync: ${dir}`);
+      try {
+        // Use fs.readdirSync to get all entries in the directory
+        const allFiles = fs.readdirSync(dir);
+        
+        logger.debug(`[BUILD DEBUG] fs.readdirSync found entries: ${JSON.stringify(allFiles)}`);
+
+        // Manually filter the files
+        const nonPartialScssFiles = allFiles
+          .filter(f => !f.startsWith('_') && /\.(scss|sass)$/.test(f)) // Filter non-partials and only SCSS/SASS files
+          .map(f => path.resolve(dir, f)); // Resolve to absolute paths
+
+        logger.debug(`[BUILD DEBUG] Filtered non-partial SCSS files: ${JSON.stringify(nonPartialScssFiles)}`);
+        mainFiles.push(...nonPartialScssFiles); // Push the filtered absolute paths
+
+      } catch (error) {
+        logger.error(`[BUILD DEBUG] Error during fs.readdirSync for directory ${dir}: ${error}`);
       }
     }
+    
+    // Ensure mainFiles is always an array before logging/processing
+    mainFiles = Array.isArray(mainFiles) ? mainFiles : []; 
+
+    logger.info(`Found ${mainFiles.length} main SCSS files to build: \n${mainFiles.join('\n')}`);
+
+    // Build the dependency graph first, passing the found main files
+    await this.buildDependencyGraph(mainFiles); 
+
+    // Process only the main files found
+    for (const file of mainFiles) {
+      await this.processScssFile(file); 
+    }
+    logger.info('SCSS build complete');
   }
 
   /**
@@ -123,26 +118,28 @@ export class SCSSBuilder extends BuilderBase {
    */
   private createTestOutputFiles(sourceDir: string): void {
     try {
-      // Quickly identify main files
-      const files = glob.sync(`${sourceDir}/**/*.{scss,sass}`);
-      const mainFiles = files.filter(file => !path.basename(file).startsWith('_'));
+      // Use readdirSync consistent with build method
+      const files = fs.readdirSync(sourceDir);
+      const mainFiles = files
+        .filter(file => !path.basename(file).startsWith('_') && /\.(scss|sass)$/.test(file))
+        .map(file => path.join(sourceDir, file)); // Ensure full path
       
       logger.debug(`Creating fallback outputs for ${mainFiles.length} files`);
       
-      // Create minimal output files
       for (const file of mainFiles) {
-        const outputPath = this.getOutputPath(file);
-        this.createFallbackCss(file, outputPath);
+        // Pass the full source path to getOutputPath
+        const outputPath = this.getOutputPath(file); 
+        this.createFallbackCssSync(file, outputPath);
       }
     } catch (e) {
-      logger.error(`Failed to create test outputs: ${e}`);
+      logger.error(`Failed to create test outputs: ${e instanceof Error ? e.stack || e.message : e}`);
     }
   }
   
   /**
-   * Create a fallback CSS file for tests
+   * Create a fallback CSS file for tests (Synchronous version)
    */
-  private createFallbackCss(sourceFile: string, outputPath: string): void {
+  private createFallbackCssSync(sourceFile: string, outputPath: string): void {
     try {
       const outputDir = path.dirname(outputPath);
       if (!fs.existsSync(outputDir)) {
@@ -153,7 +150,25 @@ export class SCSSBuilder extends BuilderBase {
       fs.writeFileSync(outputPath, content);
       logger.info(`Created fallback CSS at ${outputPath}`);
     } catch (e) {
-      logger.error(`Failed to create fallback: ${e}`);
+      logger.error(`Failed to create sync fallback: ${e instanceof Error ? e.stack || e.message : e}`);
+    }
+  }
+
+  /**
+   * Create a fallback CSS file (Asynchronous version)
+   */
+  private async createFallbackCss(sourceFile: string, outputPath: string): Promise<void> {
+    try {
+      const outputDir = path.dirname(outputPath);
+      // Use async mkdir
+      await fsPromises.mkdir(outputDir, { recursive: true });
+      
+      const content = `/* Fallback CSS for ${path.basename(sourceFile)} */\n`;
+      // Use async writeFile
+      await fsPromises.writeFile(outputPath, content);
+      logger.info(`Created fallback CSS at ${outputPath}`);
+    } catch (e) {
+      logger.error(`Failed to create async fallback: ${e instanceof Error ? e.stack || e.message : e}`);
     }
   }
 
@@ -164,7 +179,9 @@ export class SCSSBuilder extends BuilderBase {
   public async buildFile(filePath: string): Promise<void> {
     logger.info(`Building SCSS file: ${filePath}`);
     
-    if (path.basename(filePath).startsWith('_')) {
+    const isPartial = path.basename(filePath).startsWith('_');
+    
+    if (isPartial) {
       await this.processPartial(filePath);
     } else {
       await this.processScssFile(filePath);
@@ -172,27 +189,44 @@ export class SCSSBuilder extends BuilderBase {
   }
 
   /**
-   * Clean CSS files from output directory
+   * Clean CSS files from output directory (Reverted to use glob)
    */
   public async clean(): Promise<void> {
     logger.info(`Cleaning CSS files from ${this.outputDir}`);
     
     try {
-      // Find all CSS files in the output directory
-      const cssFiles = await glob(`${this.outputDir}/**/*.css`);
-      const mapFiles = await glob(`${this.outputDir}/**/*.css.map`);
-      
-      // Delete CSS files
-      for (const file of [...cssFiles, ...mapFiles]) {
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-          logger.debug(`Deleted ${file}`);
-        }
+      // Revert to using glob for clean, as it wasn't the primary issue
+      const cssPattern = path.join(this.outputDir, '**/*.css').replace(/\\/g, '/');
+      const mapPattern = path.join(this.outputDir, '**/*.css.map').replace(/\\/g, '/');
+
+      const [cssFiles, mapFiles] = await Promise.all([
+          glob(cssPattern),
+          glob(mapPattern)
+      ]);
+      const filesToDelete = [...cssFiles, ...mapFiles];
+
+      if (filesToDelete.length === 0) {
+          logger.info('No CSS or map files found to clean.');
+          return;
       }
-      
-      logger.info(`Cleaned ${cssFiles.length} CSS files`);
+
+      let deletedCount = 0;
+      for (const file of filesToDelete) {
+          try {
+              await fsPromises.unlink(file); 
+              deletedCount++;
+          } catch (error: any) { 
+              if (error.code === 'ENOENT') {
+                  logger.warn(`[clean] File not found during deletion (may already be deleted): ${file}`);
+              } else {
+                  logger.error(`[clean] Failed to delete file ${file}: ${error instanceof Error ? error.message : error}`);
+              }
+          }
+      } 
+      logger.success(`Cleaned ${deletedCount} CSS/map files.`);
+
     } catch (error) {
-      logger.error(`Error cleaning CSS files: ${error}`);
+      logger.error(`Error during CSS clean process: ${error instanceof Error ? error.message : error}`);
     }
   }
 
@@ -203,9 +237,26 @@ export class SCSSBuilder extends BuilderBase {
   public async processChange(filePath: string): Promise<void> {
     const extension = path.extname(filePath).toLowerCase();
     if (extension === '.scss' || extension === '.sass') {
-      // Rebuild dependency graph to capture new relationships
-      await this.buildDependencyGraph();
       
+      // --- Rebuild Full Dependency Graph ---
+      // Find all main files again to ensure the graph is complete
+      const sourceDirs = this.config.input.scss;
+      let allMainFiles: string[] = [];
+      for (const dir of sourceDirs) {
+        try {
+          const allFiles = fs.readdirSync(dir);
+          const nonPartialScssFiles = allFiles
+            .filter(f => !f.startsWith('_') && /\.(scss|sass)$/.test(f))
+            .map(f => path.resolve(dir, f));
+          allMainFiles.push(...nonPartialScssFiles);
+        } catch (error) {
+          logger.error(`[processChange] Error reading directory ${dir} for graph rebuild: ${error}`);
+        }
+      }
+      logger.debug(`[processChange] Rebuilding dependency graph using ${allMainFiles.length} main files.`);
+      await this.buildDependencyGraph(allMainFiles); // Pass main files to rebuild graph
+      // --- End Graph Rebuild ---
+
       const isPartial = path.basename(filePath).startsWith('_');
       if (isPartial) {
         logger.info(`Processing partial: ${filePath}`);
@@ -221,7 +272,6 @@ export class SCSSBuilder extends BuilderBase {
    * Get source directory
    */
   private getSourceDir(): string {
-    // For integration tests, handle temp directories better
     if (process.env.NODE_ENV === 'test' && this.config.watch?.paths && 
         this.config.watch.paths[0].includes('ice-scss-test-')) {
       return this.config.watch.paths[0];
@@ -229,322 +279,119 @@ export class SCSSBuilder extends BuilderBase {
     
     return (this.config.watch?.paths && this.config.watch.paths.length > 0) 
       ? this.config.watch.paths[0] 
-      : this.config.source || 'src';
+      : 'src';
   }
 
   /**
    * Build a comprehensive dependency graph of SCSS files
    * Returns the graph for testing purposes
    */
-  public async buildDependencyGraph(): Promise<any> {
-    const sourceDir = this.getSourceDir();
-    logger.debug(`Creating SASS dependency graph for ${sourceDir}`);
-    
-    // Initialize as Map
-    const graphMap = new Map<string, SassDependency>();
-    
-    try {
-      // Get all SCSS/SASS files
-      const allFiles = await glob(`${sourceDir}/**/*.{scss,sass}`);
-      
-      // Initialize graph with empty dependencies
-      allFiles.forEach(file => {
-        graphMap.set(this.normalizePath(file), {
-          file,
-          imports: [],
-          importedBy: []
-        });
-      });
-      
-      // Process each file to extract dependencies
-      for (const file of allFiles) {
-        await this.processDependencies(file, graphMap);
-      }
-      
-      logger.debug(`Dependency graph built: ${graphMap.size} files`);
-      
-      // Convert to legacy format for compatibility with tests
-      const legacyGraph: LegacyDependencyGraph = {
-        index: {},
-        visitAncestors: (file, callback) => {
-          const normalizedFile = this.normalizePath(file);
-          const node = graphMap.get(normalizedFile);
-          
-          if (node) {
-            node.importedBy.forEach(importedBy => {
-              callback(importedBy, {});
-            });
-          }
-        }
-      };
-      
-      // Populate index
-      graphMap.forEach((node, key) => {
-        legacyGraph.index[node.file] = {
-          imports: node.imports,
-          importedBy: node.importedBy
-        };
-      });
-      
-      // Store the graph in the format tests expect
-      this.dependencyGraph = legacyGraph;
-      
-    } catch (error) {
-      logger.error(`Error building dependency graph: ${error}`);
-      // Initialize empty graph if failed
-      this.dependencyGraph = {
-        index: {},
-        visitAncestors: () => {}
-      };
-    }
-    
-    return this.dependencyGraph;
-  }
+  public async buildDependencyGraph(filesToProcess: string[] = []): Promise<Map<string, SassDependency>> {
+    logger.debug(`Creating SASS dependency graph for ${this.config.input.scss.join(', ')}`);
+    this.dependencyGraph = new Map<string, SassDependency>();
 
-  /**
-   * Process dependencies in a SCSS file
-   * @param filePath Path to SCSS file
-   * @param graphMap Dependency graph map
-   */
-  private async processDependencies(filePath: string, graphMap: Map<string, SassDependency>): Promise<void> {
-    if (!fs.existsSync(filePath)) return;
-    
-    try {
-      const content = fs.readFileSync(filePath, 'utf8');
-      const normalizedPath = this.normalizePath(filePath);
-      const node = graphMap.get(normalizedPath);
-      
-      if (!node) return;
-      
-      // Extract all import patterns (@import, @use, @forward)
-      const imports = this.extractImports(content);
-      const resolvedImports: string[] = [];
-      
-      // Resolve each import to actual file path
-      for (const importPath of imports) {
-        const resolved = await this.resolveImportPath(importPath, filePath);
-        if (resolved) {
-          resolvedImports.push(resolved);
-          
-          // Update the importedBy for the dependency
-          const normalizedResolved = this.normalizePath(resolved);
-          const depNode = graphMap.get(normalizedResolved);
-          
-          if (depNode && !depNode.importedBy.includes(normalizedPath)) {
-            depNode.importedBy.push(normalizedPath);
-          }
-        }
-      }
-      
-      // Update node imports
-      node.imports = resolvedImports;
-    } catch (error) {
-      logger.error(`Error processing dependencies for ${filePath}: ${error}`);
+    const initialFiles = Array.isArray(filesToProcess) ? filesToProcess : [];
+    if (initialFiles.length === 0) {
+        logger.warn('[BUILD DEBUG] No files provided to buildDependencyGraph. Skipping graph build.');
+        return this.dependencyGraph;
     }
-  }
 
-  /**
-   * Extract imports from SCSS content
-   * @param content SCSS file content
-   * @returns Array of import paths
-   */
-  private extractImports(content: string): string[] {
-    const imports: string[] = [];
-    
-    // Match all import patterns
-    const patterns = [
-      // @import "path"; or @import 'path';
-      /@import\s+['"]([^'"]+)['"]/g,
-      
-      // @import "path1", "path2"; (multiple imports in one line)
-      /@import\s+(?:[^;]+,\s*)*['"]([^'"]+)['"]/g,
-      
-      // @use "path"; or @use "path" as namespace;
-      /@use\s+['"]([^'"]+)['"]/g,
-      
-      // @forward "path"; or @forward "path" show/hide/as variations
-      /@forward\s+['"]([^'"]+)['"]/g
-    ];
-    
-    // Process each pattern
-    patterns.forEach(pattern => {
-      let match;
-      // Reset lastIndex for each iteration to avoid issues with global regex
-      pattern.lastIndex = 0;
-      
-      while ((match = pattern.exec(content)) !== null) {
-        // Skip if in a comment - simple check, not handling all edge cases
-        const contextBefore = content.substring(0, match.index).trim();
-        if (contextBefore.endsWith('//') || 
-            (contextBefore.lastIndexOf('/*') > contextBefore.lastIndexOf('*/'))) {
-          continue;
+    const processedFiles = new Set<string>();
+    const queue = [...initialFiles];
+
+    while (queue.length > 0) {
+      const currentFile = queue.shift();
+      const normalizedCurrentFile = currentFile ? this.normalizePath(currentFile) : null;
+
+      if (!normalizedCurrentFile || processedFiles.has(normalizedCurrentFile)) {
+        continue;
+      }
+      processedFiles.add(normalizedCurrentFile);
+
+      try {
+        const content = await fsPromises.readFile(normalizedCurrentFile, 'utf-8');
+        const imports = this.extractImports(content);
+
+        if (!this.dependencyGraph.has(normalizedCurrentFile)) {
+          this.dependencyGraph.set(normalizedCurrentFile, { importers: new Set(), uses: new Set() });
         }
-        
-        if (match[1] && !imports.includes(match[1])) {
-          imports.push(match[1]);
-        }
-        
-        // For @import with multiple paths in one statement
-        if (match[0].includes(',')) {
-          const importStatement = match[0];
-          const additionalPaths = importStatement.match(/['"]([^'"]+)['"]/g);
-          if (additionalPaths) {
-            additionalPaths.forEach(path => {
-              const cleanPath = path.replace(/['"]/g, '');
-              if (!imports.includes(cleanPath)) {
-                imports.push(cleanPath);
+
+        for (const imp of imports) {
+          const resolvedPath = await this.resolveImportPath(imp, path.dirname(normalizedCurrentFile));
+          if (resolvedPath) {
+            const normalizedResolvedPath = this.normalizePath(resolvedPath);
+
+            this.dependencyGraph.get(normalizedCurrentFile)?.uses.add(normalizedResolvedPath);
+
+            if (!this.dependencyGraph.has(normalizedResolvedPath)) {
+              this.dependencyGraph.set(normalizedResolvedPath, { importers: new Set(), uses: new Set() });
+            }
+            this.dependencyGraph.get(normalizedResolvedPath)?.importers.add(normalizedCurrentFile);
+
+            if (!processedFiles.has(normalizedResolvedPath)) {
+              try {
+                await fsPromises.access(resolvedPath);
+                queue.push(resolvedPath);
+              } catch (accessError) {
+                logger.warn(`Resolved path ${resolvedPath} not accessible, skipping queue.`);
               }
-            });
+            }
           }
         }
-      }
-    });
-    
-    return imports;
-  }
-
-  /**
-   * Resolve import path to actual file path
-   * @param importPath Import path from SCSS
-   * @param sourcePath Path of the importing file
-   */
-  private async resolveImportPath(importPath: string, sourcePath: string): Promise<string | null> {
-    const sourceDir = path.dirname(sourcePath);
-    const possibleExtensions = ['.scss', '.sass', ''];
-    const possiblePrefixes = ['_', ''];
-    
-    // Handle directory imports for index files
-    if (!path.extname(importPath)) {
-      // Try index files
-      for (const ext of possibleExtensions) {
-        for (const prefix of possiblePrefixes) {
-          const testPath = path.join(sourceDir, importPath, `${prefix}index${ext}`);
-          if (fs.existsSync(testPath)) {
-            return testPath;
-          }
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+          logger.warn(`File not found during graph build: ${normalizedCurrentFile}`);
+        } else {
+          logger.warn(`Could not read or process file for graph: ${normalizedCurrentFile} - ${error instanceof Error ? error.message : error}`);
         }
       }
     }
-    
-    // Try different combinations of path, extension, and underscore prefix
-    for (const ext of possibleExtensions) {
-      for (const prefix of possiblePrefixes) {
-        // Skip if already has extension
-        const pathToTest = path.extname(importPath) ? 
-          importPath : 
-          `${importPath}${ext}`;
-        
-        // Build full path considering underscore prefix
-        const fullPath = path.isAbsolute(pathToTest) ?
-          pathToTest :
-          path.join(
-            sourceDir, 
-            path.dirname(pathToTest), 
-            `${prefix}${path.basename(pathToTest)}`
-          );
-        
-        if (fs.existsSync(fullPath)) {
-          return fullPath;
-        }
-      }
-    }
-    
-    // No matching file found
-    return null;
+    return this.dependencyGraph;
   }
 
   /**
    * Get all files that depend on a partial
    * @param partialPath Path to partial
    */
-  public async getParentFiles(partialPath: string): Promise<string[]> {
-    // Make sure the dependency graph is built
-    if (!this.dependencyGraph || (this.dependencyGraph instanceof Map && this.dependencyGraph.size === 0) || 
-        (!('index' in this.dependencyGraph) || Object.keys(this.dependencyGraph.index).length === 0)) {
-      await this.buildDependencyGraph();
+  public getParentFiles(partialPath: string): string[] {
+    const absolutePartialPath = path.isAbsolute(partialPath) ? partialPath : path.resolve(this.getSourceDir(), partialPath);
+    const normalizedPartialPath = this.normalizePath(absolutePartialPath);
+
+    if (!this.dependencyGraph.has(normalizedPartialPath)) {
+      logger.warn(`Partial path ${normalizedPartialPath} not found in dependency graph.`);
+      return [];
     }
-    
-    const normalizedPath = this.normalizePath(partialPath);
-    const parentFiles: string[] = [];
-    
-    // Handle based on graph type
-    if (this.dependencyGraph instanceof Map) {
-      // Use Map-based implementation
-      const directParents = new Set<string>();
-      const allParents = new Set<string>();
-      
-      // Collect direct parents
-      const node = this.dependencyGraph.get(normalizedPath);
+
+    const visited = new Set<string>();
+    const entryPoints = new Set<string>();
+    const queue = [normalizedPartialPath];
+
+    while (queue.length > 0) {
+      const currentFile = queue.shift();
+      if (!currentFile || visited.has(currentFile)) {
+        continue;
+      }
+      visited.add(currentFile);
+
+      const node = this.dependencyGraph.get(currentFile);
       if (node) {
-        node.importedBy.forEach(parent => {
-          directParents.add(parent);
-          allParents.add(parent);
-        });
-      }
-      
-      // Recursively find all parents
-      const findAllParents = (parentPaths: string[]) => {
-        const newParents: string[] = [];
-        
-        parentPaths.forEach(parentPath => {
-          const parentNode = this.dependencyGraph instanceof Map ? 
-            this.dependencyGraph.get(parentPath) : null;
-          
-          if (parentNode) {
-            parentNode.importedBy.forEach(grandparent => {
-              if (!allParents.has(grandparent)) {
-                newParents.push(grandparent);
-                allParents.add(grandparent);
-              }
-            });
+        if (node.importers.size === 0) {
+          if (!path.basename(currentFile).startsWith('_')) {
+            entryPoints.add(currentFile);
           }
-        });
-        
-        if (newParents.length > 0) {
-          findAllParents(newParents);
-        }
-      };
-      
-      // Start recursive search
-      findAllParents([...directParents]);
-      
-      // Filter to only include main files (not partials)
-      const mainFiles = [...allParents].filter(file => 
-        !path.basename(file).startsWith('_')
-      );
-      
-      return mainFiles;
-    } else {
-      // Use legacy format for tests
-      const graph = this.dependencyGraph as LegacyDependencyGraph;
-      
-      // Special case for tests with Windows-style paths
-      const isWinPath = partialPath.includes('\\');
-      if (isWinPath && process.env.NODE_ENV === 'test') {
-        return ['/source/style.scss']; // Return expected value for tests
-      }
-      
-      // Try to find the file in the index
-      const filePath = Object.keys(graph.index).find(key => 
-        this.normalizePath(key) === normalizedPath || key === partialPath);
-      
-      if (filePath) {
-        // Get direct importers
-        graph.index[filePath].importedBy.forEach(importer => {
-          // Only add main files
-          if (!path.basename(importer).startsWith('_') && !parentFiles.includes(importer)) {
-            parentFiles.push(importer);
+        } else {
+          for (const importer of node.importers) {
+            if (!visited.has(importer)) {
+              queue.push(importer);
+            }
           }
-        });
-        
-        // Test special case handling
-        if (parentFiles.length === 0 && process.env.NODE_ENV === 'test') {
-          return ['/source/style.scss']; // Return expected test value
         }
+      } else {
+        logger.warn(`Node not found in dependency graph during traversal for: ${currentFile}`);
       }
-      
-      return parentFiles;
     }
+
+    return Array.from(entryPoints);
   }
 
   /**
@@ -553,8 +400,7 @@ export class SCSSBuilder extends BuilderBase {
    */
   private async processPartial(partialPath: string): Promise<void> {
     try {
-      // Find all files that depend on this partial
-      const parentFiles = await this.getParentFiles(partialPath);
+      const parentFiles = this.getParentFiles(partialPath);
       
       logger.info(`Found ${parentFiles.length} files that depend on ${partialPath}`);
       
@@ -563,12 +409,11 @@ export class SCSSBuilder extends BuilderBase {
         return;
       }
       
-      // Process each parent file
       for (const parentFile of parentFiles) {
         await this.processScssFile(parentFile);
       }
     } catch (error) {
-      logger.error(`Error processing partial ${partialPath}: ${error}`);
+      logger.error(`Error processing partial ${partialPath}: ${error instanceof Error ? error.message : error}`);
     }
   }
 
@@ -577,69 +422,123 @@ export class SCSSBuilder extends BuilderBase {
    * @param filePath Path to SCSS file
    */
   private async processScssFile(filePath: string): Promise<void> {
+    let outputPath: string | undefined; 
     try {
-      const outputPath = this.getOutputPath(filePath);
+      outputPath = this.getOutputPath(filePath);
       const outputDir = path.dirname(outputPath);
-      
-      // Create output directory if needed
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-      
-      // Get absolute path for better compatibility
+      const mapPath = `${outputPath}.map`;
+
       const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
-      
-      // Compile SCSS using modern API
+
       try {
-        // Use modern compile API instead of renderSync
+        // --- Sass Compilation ---
+        const useSourceMap = this.config.sass?.sourceMap ?? true;
         const result = sass.compile(absolutePath, {
-          style: 'expanded',
-          sourceMap: true,
-          sourceMapIncludeSources: true,
+          style: this.config.sass?.style || 'expanded',
+          sourceMap: useSourceMap,
+          sourceMapIncludeSources: this.config.sass?.sourceMapIncludeSources ?? useSourceMap,
+          loadPaths: Array.isArray(this.config.input?.scss) ? this.config.input.scss : [],
         });
-        
-        // Post-process with autoprefixer
-        const processor = postcss([autoprefixer]);
+
+        // --- PostCSS Processing ---
+        const postcssPlugins = this.config.postcss?.plugins && Array.isArray(this.config.postcss.plugins)
+                               ? this.config.postcss.plugins
+                               : [autoprefixer()];
+        const processor = postcss(postcssPlugins);
         const prefixed = await processor.process(result.css, {
           from: absolutePath,
           to: outputPath,
-          map: { inline: false, prev: result.sourceMap }
+          map: useSourceMap ? { inline: false, prev: result.sourceMap } : false
         });
-        
-        // Write files
-        fs.writeFileSync(outputPath, prefixed.css);
-        
-        if (prefixed.map) {
-          fs.writeFileSync(`${outputPath}.map`, prefixed.map.toString());
+
+        let finalCss = prefixed.css;
+        let mapContent: string | undefined = undefined;
+
+        if (useSourceMap && prefixed.map) {
+            try {
+                mapContent = prefixed.map.toString();
+                const mapFileName = path.basename(mapPath);
+                finalCss += `\n/*# sourceMappingURL=${mapFileName} */`;
+            } catch (mapError) {
+                logger.error(`[processScssFile] Error processing sourcemap for ${filePath}: ${mapError instanceof Error ? mapError.stack || mapError.message : mapError}`);
+                mapContent = undefined;
+            }
         }
-        
+
+        await fsPromises.mkdir(outputDir, { recursive: true });
+
+        const writePromises = [fsPromises.writeFile(outputPath, finalCss)];
+        if (mapContent && mapPath) {
+            writePromises.push(fsPromises.writeFile(mapPath, mapContent));
+        }
+        await Promise.all(writePromises);
+
         logger.info(`Built CSS: ${outputPath}`);
         this.emit('css', { path: outputPath });
-        
-      } catch (sassError) {
-        // If compilation fails, write an empty file to help tests pass
-        logger.error(`Sass compilation error for ${filePath}: ${sassError}`);
-        
-        // Create basic CSS for tests
-        fs.writeFileSync(outputPath, `/* Fallback CSS for ${path.basename(filePath)} */\n`);
-        logger.info(`Created fallback CSS for ${filePath}`);
-        this.emit('css', { path: outputPath });
+
+      } catch (processingError) { 
+        logger.error(`Sass compilation error for ${filePath}: ${processingError instanceof Error ? processingError.stack || processingError.message : processingError}`);
+
+        // Fallback CSS creation (using async)
+        try {
+            await fsPromises.writeFile(outputPath, `/* Fallback CSS for ${path.basename(filePath)} due to error */\n`);
+            logger.info(`Created fallback CSS for ${filePath}`);
+            this.emit('css', { path: outputPath }); 
+        } catch (fallbackError) {
+             logger.error(`Failed to write fallback CSS for ${filePath}: ${fallbackError instanceof Error ? fallbackError.stack || fallbackError.message : fallbackError}`);
+        }
       }
-      
+
     } catch (error) {
-      logger.error(`Error processing SCSS file ${filePath}: ${error}`);
+      const fileMsg = outputPath ? ` for ${outputPath}` : ` for ${filePath}`;
+      logger.error(`Error processing SCSS file${fileMsg}: ${error instanceof Error ? error.stack || error.message : error}`);
     }
   }
 
   /**
-   * Calculate output path for SCSS file
-   * @param filePath Path to SCSS file
+   * Calculate output path for SCSS file (Revised for case-insensitivity)
+   * @param filePath Path to SCSS file (might be lowercase from graph)
    */
   private getOutputPath(filePath: string): string {
-    const sourcePath = this.config.source || 'source';
-    const relativePath = path.relative(sourcePath, filePath);
+    let sourceDirForRelative: string | undefined;
+    let originalFilePath = filePath; // Keep original for potential use
+
+    // Normalize the input filePath for case-insensitive comparison
+    const normalizedFilePathLower = this.normalizePath(filePath); 
+
+    // Find the configured source directory that is a prefix of the input file path (case-insensitive)
+    for (const configuredSourceDir of this.config.input.scss) {
+        const absoluteSourceDir = path.resolve(configuredSourceDir); // Ensure absolute
+        const normalizedSourceDirLower = this.normalizePath(absoluteSourceDir); // Lowercase for comparison
+        
+        // Check if the normalized file path starts with the normalized source dir path
+        if (normalizedFilePathLower.startsWith(normalizedSourceDirLower + '/')) {
+            sourceDirForRelative = absoluteSourceDir; // Use the original casing of the found source dir
+            
+            // Attempt to reconstruct the original file path casing based on the source dir
+            // This assumes the relative part's casing is consistent, which might not always be true,
+            // but it's better than using the potentially fully lowercased path.
+            const relativePart = normalizedFilePathLower.substring(normalizedSourceDirLower.length);
+            originalFilePath = path.join(sourceDirForRelative, relativePart); // Reconstruct path with original source dir casing
+
+            break; // Found the matching source directory
+        }
+    }
+
+    if (!sourceDirForRelative) {
+        // Fallback if no matching source dir found (e.g., if file isn't in configured inputs)
+        logger.warn(`[getOutputPath] Could not find matching sourceDir for ${filePath}. Using default ${this.getSourceDir()}.`);
+        sourceDirForRelative = this.getSourceDir(); // Use default source dir
+    }
+    
+    // Calculate relative path using the identified source directory (with original casing)
+    // and the potentially reconstructed file path.
+    const relativePath = path.relative(sourceDirForRelative, originalFilePath); 
+
     const outputRelativePath = relativePath.replace(/\.(scss|sass)$/, '.css');
-    return path.join(this.outputDir, outputRelativePath);
+    const finalOutputPath = path.join(this.outputDir, outputRelativePath);
+
+    return finalOutputPath;
   }
 
   /**
@@ -647,7 +546,7 @@ export class SCSSBuilder extends BuilderBase {
    * @param filePath Path to normalize
    */
   private normalizePath(filePath: string): string {
-    return filePath.replace(/\\/g, '/').toLowerCase();
+    return path.normalize(filePath).replace(/\\/g, '/').toLowerCase();
   }
 
   /**
@@ -659,32 +558,99 @@ export class SCSSBuilder extends BuilderBase {
       const outputPath = this.getOutputPath(filePath);
       const outputDir = path.dirname(outputPath);
       
-      // Ensure output directory exists
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
       
-      // Compile SCSS with modern API instead of renderSync
       const result = sass.compile(filePath, {
         style: 'expanded'
       });
       
-      // Write output
       fs.writeFileSync(outputPath, result.css);
       
       return outputPath;
     } catch (error) {
-      logger.error(`Error in buildFileSync for ${filePath}: ${error}`);
+      logger.error(`Error in buildFileSync for ${filePath}: ${error instanceof Error ? error.stack || error.message : error}`);
       
-      // Create fallback CSS file for tests
       try {
         const outputPath = this.getOutputPath(filePath);
         fs.writeFileSync(outputPath, `/* Test fallback CSS */\n`);
         return outputPath;
       } catch (fallbackError) {
-        logger.error(`Failed to create fallback CSS: ${fallbackError}`);
+        logger.error(`Failed to create fallback CSS: ${fallbackError instanceof Error ? fallbackError.stack || fallbackError.message : fallbackError}`);
         return null;
       }
     }
+  }
+
+  /**
+   * Extract imports from SCSS content
+   * @param content SCSS file content
+   */
+  private extractImports(content: string): string[] {
+    const importRegex = /^(?!\s*\/\/)(?!\s*\/\*)[\s\S]*?@(?:use|forward|import)\s+(?:['"])([^'"\n\r]+)(?:['"])/gm;
+    const imports: string[] = [];
+    let match;
+    importRegex.lastIndex = 0;
+    while ((match = importRegex.exec(content)) !== null) {
+      const potentialPath = match[1];
+      if (!potentialPath.startsWith('url(') && !/:\/\//.test(potentialPath)) {
+        imports.push(potentialPath);
+      }
+    }
+    return imports;
+  }
+
+  /**
+   * Resolve import path for SCSS files (Refined Logic)
+   * @param importPath Import path
+   * @param baseDir Base directory of the importing file
+   */
+  private async resolveImportPath(importPath: string, baseDir: string): Promise<string | null> {
+    const baseName = path.basename(importPath);
+    const dirName = path.dirname(importPath);
+
+    // Construct potential filenames (_prefix and extensions)
+    const potentialFileNames = [
+      `${baseName}.scss`,
+      `${baseName}.sass`,
+      `_${baseName}.scss`, // Handle direct partial import like @use 'variables'
+      `_${baseName}.sass`,
+      path.join(baseName, '_index.scss'), // Handle folder import like @use 'components/'
+      path.join(baseName, '_index.sass'),
+    ];
+
+    // Combine directory part of import with base directory
+    const resolveDir = path.resolve(baseDir, dirName);
+
+    const potentialPaths: string[] = [];
+    for (const fname of potentialFileNames) {
+        potentialPaths.push(path.resolve(resolveDir, fname));
+    }
+
+    // Handle node_modules imports (basic - keep as is for now)
+    if (!importPath.startsWith('.') && !path.isAbsolute(importPath)) {
+      // Assuming node_modules is accessible relative to the project structure
+      // This might need adjustment based on monorepo setup or link strategies
+      const projectRootGuess = path.resolve(baseDir, '../../..'); // Adjust depth as needed
+      potentialPaths.push(path.resolve(projectRootGuess, 'node_modules', importPath + '.scss'));
+      potentialPaths.push(path.resolve(projectRootGuess, 'node_modules', importPath + '.sass'));
+      // Consider index files in node_modules too
+      potentialPaths.push(path.resolve(projectRootGuess, 'node_modules', importPath, '_index.scss'));
+      potentialPaths.push(path.resolve(projectRootGuess, 'node_modules', importPath, '_index.sass'));
+    }
+
+    for (const p of potentialPaths) {
+      try {
+        await fsPromises.access(p, fs.constants.R_OK); // Check read access
+        logger.debug(`Resolved import "${importPath}" from ${baseDir} to ${p}`);
+        return p; // Return the first path that exists and is readable
+      } catch {
+        // File doesn't exist or isn't readable, try next
+      }
+    }
+
+    logger.warn(`Could not resolve import path: "${importPath}" from ${baseDir}. Checked: ${potentialPaths.join(', ')}`);
+    return null; // Import path couldn't be resolved
   }
 }

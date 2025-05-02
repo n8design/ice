@@ -1,227 +1,146 @@
-# Ice Build
+# Ice Build Tool
 
-`@n8d/ice-build` is a lightweight, modern frontend build tool designed for TypeScript and SCSS projects with built-in hot reload support.
+Ice Build is a modern, fast, and efficient build tool designed for TypeScript and SCSS projects. It leverages esbuild for TypeScript compilation and Dart Sass for SCSS compilation, providing a streamlined development experience with built-in watch mode and hot reloading capabilities.
 
 ![hTWOo Iced Logo](https://raw.githubusercontent.com/n8design/ice/refs/heads/main/assets/frozen-htwoo.webp)
 
-## Overview
+## Features
 
-Ice Build simplifies frontend development with a fast, efficient build system that includes:
-
-- TypeScript/TSX compilation with esbuild
-- SCSS compilation with Dart Sass
-- PostCSS processing with Autoprefixer
-- Smart dependency tracking for partial SCSS files
-- Hot Module Reloading via integration with ice-hotreloader
-- Live reload for instant CSS updates without page refreshes
+*   **Fast Builds:** Utilizes esbuild and Dart Sass for rapid compilation.
+*   **TypeScript Support:** Compiles TypeScript (`.ts`, `.tsx`) files efficiently.
+*   **Modern SCSS:** Compiles SCSS/SASS (`.scss`, `.sass`) using the modern Dart Sass implementation.
+*   **Watch Mode:** Monitors files for changes and automatically rebuilds.
+*   **Hot Reloading:** Integrates with `@n8d/ice-hotreloader` for seamless CSS injection and page reloads.
+*   **PostCSS Integration:** Includes Autoprefixer for CSS vendor prefixes.
+*   **Configurable:** Uses an `ice.config.js` file for project-specific settings.
 
 ## Installation
 
-Install the package and its peer dependencies:
-
 ```bash
-# Install ice-build and its required hot-reloader
-npm install --save-dev @n8d/ice-build @n8d/ice-hotreloader
-
-# Install required peer dependencies
-npm install --save-dev esbuild sass postcss autoprefixer
-
-# Optional peer dependencies for enhanced functionality
-npm install --save-dev eslint typescript
+npm install @n8d/ice-build --save-dev
+# or
+yarn add @n8d/ice-build --dev
 ```
 
-## Quick Start
+## Usage
 
-### Basic Usage
+### CLI Commands
 
-1. Create your project with the following structure:
-   ```
-   project/
-   ├── source/         # Source files
-   │   ├── index.ts    # TypeScript entry point
-   │   └── styles.scss # SCSS styles
-   ├── public/         # Output directory (created automatically)
-   └── package.json    # Project configuration
-   ```
+*   **`ice-build build`**: Compiles the project based on the configuration.
+    *   `--config <path>`: Specify a custom path to the configuration file. Defaults to `./ice.config.js`.
+    *   `--clean`: Clean the output directory before building.
+    *   `--verbose`: Enable verbose logging.
+*   **`ice-build watch`**: Starts the build process in watch mode with hot reloading.
+    *   `--config <path>`: Specify a custom path to the configuration file. Defaults to `./ice.config.js`.
+    *   `--verbose`: Enable verbose logging.
 
-2. Add scripts to your `package.json`:
-   ```json
-   "scripts": {
-     "start": "ice-build --watch",
-     "build": "ice-build --clean",
-     "clean": "rimraf public/*.js public/*.css public/*.map"
-   }
-   ```
+### Configuration (`ice.config.js`)
 
-3. Run development mode:
-   ```bash
-   npm start
-   ```
+Create an `ice.config.js` file in your project root:
 
-4. Build for production:
-   ```bash
-   npm run build
-   ```
-
-### Custom Configuration
-
-Create an `ice.config.js` file in your project root to customize the build:
-
-```js
+```javascript
 // ice.config.js
 export default {
   input: {
-    ts: ['source/**/*.ts', 'source/**/*.tsx'],
-    scss: ['source/**/*.scss']
+    path: 'source', // Default input directory (corrected)
+    // Define specific entry points if needed, otherwise all .ts/.tsx/.scss/.sass in input.path are processed
+    // entries: {
+    //   main: 'index.ts',
+    //   styles: 'style.scss'
+    // }
   },
   output: {
-    path: 'public'
+    path: 'public', // Default output directory (corrected)
+    // Configure output filenames if needed
+    // filenames: {
+    //   js: '[name].bundle.js',
+    //   css: '[name].bundle.css'
+    // }
   },
-  watch: {
-    paths: ['source'],
-    ignored: ['node_modules', '.git', 'public']
+  // SCSS specific options
+  scss: {
+    // includePaths: ['node_modules'], // Add paths for @import or @use
+    // sourceMap: true, // Enable/disable source maps (default: true for dev, false for prod)
   },
+  // TypeScript specific options (using esbuild)
+  typescript: {
+    // target: 'es2020', // esbuild target (default: 'es2020')
+    // format: 'esm', // esbuild format (default: 'esm')
+    // sourceMap: true, // Enable/disable source maps (default: true for dev, false for prod)
+  },
+  // Hot reloading options
   hotreload: {
-    port: 3001,
-    debounceTime: 300
+    port: 8080, // WebSocket server port (default: 8080)
   },
-  esbuild: {
-    bundle: true,
-    minify: true,
-    sourcemap: true,
-    target: 'es2018'
-  },
-  sass: {
-    style: 'expanded',
-    sourceMap: true
+  // Copy static assets
+  assets: {
+    // Define source and destination for static files
+    // Example: copy everything from 'source/assets' to 'public/assets'
+    // 'assets': 'assets'
   }
-}
+};
 ```
 
-## CLI Options
+### Hot Reloading Client Script
 
-```
-ice-build [options]
-
-Options:
-  -V, --version        output the version number
-  -c, --config <path>  Path to config file
-  -w, --watch          Watch for changes and rebuild
-  --clean              Clean output directory before building
-  -v, --verbose        Enable verbose logging
-  -h, --help           display help for command
-```
-
-## Configuration Reference
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `input.ts` | `string[]` | `['src/**/*.ts', 'src/**/*.tsx']` | TypeScript source globs |
-| `input.scss` | `string[]` | `['src/**/*.scss', 'src/**/*.sass']` | SCSS source globs |
-| `input.html` | `string[]` | `['src/**/*.html']` | HTML source globs |
-| `output.path` | `string` | `'dist'` | Output directory path |
-| `watch.paths` | `string[]` | `['src']` | Directories to watch for changes |
-| `watch.ignored` | `string[]` | `['node_modules', '.git', 'dist']` | Patterns to ignore when watching |
-| `hotreload.port` | `number` | `3001` | WebSocket server port |
-| `hotreload.debounceTime` | `number` | `300` | Debounce time for reload events (ms) |
-| `esbuild` | `object` | See below | esbuild configuration |
-| `sass` | `object` | See below | Sass compiler configuration |
-| `postcss` | `object` | See below | PostCSS configuration |
-
-### Default esbuild Configuration
-
-```js
-{
-  bundle: true,
-  minify: true,
-  sourcemap: true,
-  target: 'es2018'
-}
-```
-
-### Default Sass Configuration
-
-```js
-{
-  style: 'expanded',
-  sourceMap: true
-}
-```
-
-### Default PostCSS Configuration
-
-```js
-{
-  plugins: [] // Autoprefixer is added automatically
-}
-```
-
-## Integration with ice-hotreloader
-
-Ice Build integrates seamlessly with ice-hotreloader to provide live reload capabilities:
-
-- CSS changes are injected without a full page reload
-- TypeScript/HTML changes trigger a full page reload
-- SCSS partial changes trigger rebuilds of all dependent files
-
-To enable hot reloading, simply add the following to your HTML:
+Include this script in your main HTML file to enable hot reloading:
 
 ```html
+<!-- ... other head elements ... -->
 <script>
-  (function() {
-    const socket = new WebSocket(`ws://${location.hostname}:3001`);
-    
-    socket.addEventListener('message', (event) => {
-      const message = JSON.parse(event.data);
-      
-      if (message.type === 'css') {
-        // CSS hot reload
-        document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
-          const url = new URL(link.href);
-          url.searchParams.set('t', Date.now());
+  const socket = new WebSocket('ws://localhost:8080'); // Use the port from your config
+
+  socket.addEventListener('message', (event) => {
+    const message = JSON.parse(event.data);
+    console.log('Hot Reload:', message);
+
+    if (message.type === 'css_update') {
+      const links = document.querySelectorAll('link[rel="stylesheet"]');
+      links.forEach(link => {
+        const url = new URL(link.href);
+        // Check if the updated file matches the stylesheet's name
+        if (url.pathname.includes(message.file)) {
+          // Append a timestamp to force browser refresh
+          url.searchParams.set('v', Date.now());
           link.href = url.toString();
-        });
-      } else if (message.type === 'full') {
-        // Full page reload
-        window.location.reload();
-      }
-    });
-  })();
+          console.log(`Injected CSS update for: ${message.file}`);
+        }
+      });
+    } else if (message.type === 'full_reload') {
+      console.log('Performing full page reload.');
+      window.location.reload();
+    }
+  });
+
+  socket.addEventListener('open', () => {
+    console.log('Hot Reload WebSocket connected.');
+  });
+
+  socket.addEventListener('close', () => {
+    console.log('Hot Reload WebSocket disconnected. Attempting to reconnect...');
+    // Optional: Implement reconnection logic
+    setTimeout(() => {
+      // Re-run the script or relevant connection part
+    }, 5000);
+  });
+
+  socket.addEventListener('error', (error) => {
+    console.error('Hot Reload WebSocket error:', error);
+  });
 </script>
+<!-- ... rest of body ... -->
 ```
 
-## SCSS Dependency Tracking
+## Development
 
-Ice Build includes intelligent SCSS dependency tracking:
+*   **Build:** `npm run build` or `yarn build`
+*   **Watch:** `npm run watch` or `yarn watch`
+*   **Lint:** `npm run lint` or `yarn lint`
+*   **Test:** `npm test` or `yarn test` (Uses **vitest**)
 
-- When a partial file (e.g., `_variables.scss`) is changed, all files that import it are automatically rebuilt
-- Supports both `@import` and `@use` syntax
-- Handles nested dependencies
+## Contributing
 
-## Node.js API
-
-You can also use Ice Build programmatically:
-
-```js
-import { ConfigManager, BuildManager } from '@n8d/ice-build';
-
-const configManager = new ConfigManager();
-const config = configManager.getConfig();
-const outputPath = configManager.getOutputPath();
-
-const buildManager = new BuildManager(config, outputPath);
-
-// Build all files
-await buildManager.buildAll();
-
-// Clean output directory
-await buildManager.cleanAll();
-```
-
-## Requirements
-
-- Node.js 18 or later
-- Project using TypeScript and/or SCSS/SASS
+Contributions are welcome! Please follow standard fork-and-pull-request workflow. Ensure tests pass and linting is clean before submitting pull requests.
 
 ## License
 

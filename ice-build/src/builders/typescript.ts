@@ -4,7 +4,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import { glob } from 'glob';
 import { Logger } from '../utils/logger.js';
-import { formatTime } from '../utils/helpers.js';
 
 const logger = new Logger('TypeScript');
 
@@ -46,7 +45,7 @@ export class TypeScriptBuilder implements Builder {
       });
       
       const endTime = Date.now();
-      logger.success(`TypeScript build completed in ${formatTime(endTime - startTime)}`);
+      logger.success(`TypeScript build completed in ${endTime - startTime}ms`);
     } catch (error: any) {
       logger.error(`TypeScript build failed: ${error.message}`);
       throw error;
@@ -72,7 +71,7 @@ export class TypeScriptBuilder implements Builder {
       });
       
       const endTime = Date.now();
-      logger.success(`TypeScript file built in ${formatTime(endTime - startTime)}`);
+      logger.success(`TypeScript file built in ${endTime - startTime}ms`);
     } catch (error: any) {
       logger.error(`TypeScript file build failed: ${error.message}`);
       throw error;
