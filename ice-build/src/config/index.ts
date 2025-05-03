@@ -129,11 +129,19 @@ export class ConfigManager {
         // Create glob patterns from input path
         this.config.input.ts = [`${inputPath}/**/*.ts`, `${inputPath}/**/*.tsx`];
         this.config.input.scss = [`${inputPath}/**/*.scss`, `${inputPath}/**/*.sass`];
+        logger.debug(`Set input paths from ${inputPath}: ts=[${this.config.input.ts}], scss=[${this.config.input.scss}]`);
       }
       
-      // Handle specific glob patterns if provided
-      if (Array.isArray(userConfig.input.ts)) this.config.input.ts = userConfig.input.ts;
-      if (Array.isArray(userConfig.input.scss)) this.config.input.scss = userConfig.input.scss;
+      // Still allow specific overrides
+      if (Array.isArray(userConfig.input.ts)) {
+        this.config.input.ts = userConfig.input.ts;
+        logger.debug(`Overrode TS input paths with: [${this.config.input.ts.join(', ')}]`);
+      }
+      
+      if (Array.isArray(userConfig.input.scss)) {
+        this.config.input.scss = userConfig.input.scss;
+        logger.debug(`Overrode SCSS input paths with: [${this.config.input.scss.join(', ')}]`);
+      }
     }
     
     // Set output path - fixed to handle string or object

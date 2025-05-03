@@ -76,36 +76,27 @@ export class SCSSBuilder extends EventEmitter implements Builder {
    */
   public async build(): Promise<void> {
     logger.info('Building all SCSS files');
-    const sourceDirs = this.config.input.scss;
-    let mainFiles: string[] = []; 
-
-    // Process all source directories from config.input.scss
-    for (const pattern of sourceDirs) {
-      try {
-        logger.debug(`Searching for SCSS files with pattern: ${pattern}`);
-        
-        // Use glob to find all matching files
-        const files = await glob(pattern);
-        
-        // Filter non-partials (files not starting with _)
-        const nonPartialFiles = files.filter(file => !path.basename(file).startsWith('_'));
-        mainFiles.push(...nonPartialFiles);
-        
-      } catch (error) {
-        logger.error(`[BUILD DEBUG] Error finding SCSS files with pattern ${pattern}: ${error}`);
-      }
-    }
     
-    logger.info(`Found ${mainFiles.length} main SCSS files to build`);
+    try {
+      // Get all SCSS files directly from config patterns
+      const allFiles = await this.getAllScssFiles();
+      
+      // Filter out partials (starting with underscore)
+      const mainFiles = allFiles.filter(file => !path.basename(file).startsWith('_'));
+      
+      logger.info(`Found ${mainFiles.length} main SCSS files to build: ${mainFiles.join(', ')}`);
+      
+      // Fix: Call without arguments 
+      await this.buildDependencyGraph();
 
-    // Fix: Call without arguments 
-    await this.buildDependencyGraph();
-
-    // Process only the main files found
-    for (const file of mainFiles) {
-      await this.processScssFile(file); 
+      // Process only the main files found
+      for (const file of mainFiles) {
+        await this.processScssFile(file); 
+      }
+      logger.info('SCSS build complete');
+    } catch (error) {
+      logger.error(`Error during SCSS build: ${error instanceof Error ? error.message : String(error)}`);
     }
-    logger.info('SCSS build complete');
   }
 
   /**
@@ -251,21 +242,35 @@ export class SCSSBuilder extends EventEmitter implements Builder {
   }
 
   /**
-   * Get all SCSS files based on the configured patterns
+   * Find all SCSS files based on the configured patterns
    */
   private async getAllScssFiles(): Promise<string[]> {
     const files: string[] = [];
     
-    // Use configured input patterns
-    const patterns = this.config.input.scss || ['source/**/*.scss', 'src/**/*.scss'];
+    // Use configured input patterns - never fallback to 'src'
+    const patterns = this.config.input.scss;
+    
+    if (!patterns || patterns.length === 0) {
+      logger.warn('No SCSS input patterns defined in config');
+      return [];
+    }
+    
+    logger.debug(`Looking for SCSS files with patterns: ${patterns.join(', ')}`);
     
     for (const pattern of patterns) {
       try {
         const matches = await glob(pattern);
+        logger.debug(`Found ${matches.length} files matching pattern: ${pattern}`);
         files.push(...matches);
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         logger.error(`Error finding files for pattern ${pattern}: ${errorMessage}`);
+        
+        // Try to provide more helpful debugging info
+        if (pattern.includes('/**/*.scss') && error instanceof Error && error.message.includes('ENOENT')) {
+          const baseDir = pattern.split('/**/*.scss')[0];
+          logger.error(`Directory ${baseDir} does not exist. Please check your input.scss configuration.`);
+        }
       }
     }
     

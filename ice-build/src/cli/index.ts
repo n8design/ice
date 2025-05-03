@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { registerBuildCommand } from './commands/build.js';
 import { registerWatchCommand } from './commands/watch.js';
+import { checkDirectories } from './commands/check-dirs.js';
 
 /**
  * Create and configure the CLI program
@@ -17,8 +18,22 @@ export function createCLI(): Command {
   // Register commands
   registerBuildCommand(program);
   registerWatchCommand(program);
+  registerCheckCommand(program);
   
   return program;
+}
+
+/**
+ * Register the "check" command
+ */
+function registerCheckCommand(program: Command): void {
+  program
+    .command('check')
+    .description('Check if all source directories exist')
+    .option('--config <path>', 'Path to config file')
+    .action((options) => {
+      checkDirectories(options.config);
+    });
 }
 
 /**
