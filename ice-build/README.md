@@ -34,6 +34,10 @@ yarn add @n8d/ice-build --dev
     *   `--config <path>`: Specify a custom path to the configuration file. Defaults to `./ice.config.js`.
     *   `--verbose`: Enable verbose logging.
 
+> **Backward Compatibility Note:** You can also use `ice-build --watch` for watch mode (equivalent to `ice-build watch`)
+> 
+> **Important:** Make sure the config file path is correct. For example, if your config file is named `ice-build.config.js`, use `--config ./ice-build.config.js`. The path is relative to the current working directory.
+
 ### Configuration (`ice.config.js`)
 
 Create an `ice.config.js` file in your project root:
@@ -81,55 +85,43 @@ export default {
 };
 ```
 
-### Hot Reloading Client Script
+### Hot Reloading
 
-Include this script in your main HTML file to enable hot reloading:
+The Ice build tool includes a built-in hot reload server that automatically refreshes CSS files without page reloads and reloads the page for HTML/JS changes.
+
+To enable hot reloading:
+
+1. Make sure `hotreload.enabled` is set to `true` in your config
+2. Add the client script to your HTML file:
 
 ```html
-<!-- ... other head elements ... -->
-<script>
-  const socket = new WebSocket('ws://localhost:8080'); // Use the port from your config
+<!-- Option 1: Auto-injected script from the hot reload server -->
+<script src="http://localhost:3001/ice-hotreload.js"></script>
 
+<!-- Option 2: Manual implementation -->
+<script>
+  const socket = new WebSocket('ws://localhost:3001/ws'); // The default port is 3001
+  
   socket.addEventListener('message', (event) => {
     const message = JSON.parse(event.data);
     console.log('Hot Reload:', message);
-
+    
     if (message.type === 'css_update') {
-      const links = document.querySelectorAll('link[rel="stylesheet"]');
-      links.forEach(link => {
+      // Refresh CSS without page reload
+      document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
         const url = new URL(link.href);
-        // Check if the updated file matches the stylesheet's name
-        if (url.pathname.includes(message.file)) {
-          // Append a timestamp to force browser refresh
-          url.searchParams.set('v', Date.now());
-          link.href = url.toString();
-          console.log(`Injected CSS update for: ${message.file}`);
-        }
+        url.searchParams.set('t', Date.now());
+        link.href = url.toString();
       });
     } else if (message.type === 'full_reload') {
-      console.log('Performing full page reload.');
-      window.location.reload();
+      // Full page reload for JS/HTML changes
+      location.reload();
     }
   });
-
-  socket.addEventListener('open', () => {
-    console.log('Hot Reload WebSocket connected.');
-  });
-
-  socket.addEventListener('close', () => {
-    console.log('Hot Reload WebSocket disconnected. Attempting to reconnect...');
-    // Optional: Implement reconnection logic
-    setTimeout(() => {
-      // Re-run the script or relevant connection part
-    }, 5000);
-  });
-
-  socket.addEventListener('error', (error) => {
-    console.error('Hot Reload WebSocket error:', error);
-  });
 </script>
-<!-- ... rest of body ... -->
 ```
+
+When files change, you will see messages in the console indicating that CSS updates or full page reloads are being triggered.
 
 ## Development
 

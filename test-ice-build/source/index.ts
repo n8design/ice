@@ -26,7 +26,7 @@ console.log('Debugging information:');
 
 // ... existing code ...
 
-// Add an invalid JavaScript syntax error
+//Add an invalid JavaScript syntax error
 // function invalidSyntax( { // Missing closing brace
 
 //   console.log("This line won't be reached if parsing fails");

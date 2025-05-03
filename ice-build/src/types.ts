@@ -1,78 +1,75 @@
-/**
- * Core types for ice-build
- */
+import { BuildOptions } from 'esbuild';
+import { Options } from 'sass';
 
-// Configuration interface
+/**
+ * ICE Builder Configuration Interface
+ */
 export interface IceConfig {
   input: {
-    ts: string[];     // TypeScript entry files/globs
-    scss: string[];   // SCSS entry files/globs
-    html?: string[];  // HTML files (optional)
+    ts: string[];
+    scss: string[];
+    html?: string[];
+    path?: string; // Input base path
+    entries?: Record<string, string>;
   };
   output: {
-    path: string;     // Output directory
+    path: string;
+    filenames?: {
+      js?: string;
+      css?: string;
+    };
+  } | string; // Output can be either a string path or an object
+  sass?: {
+    style?: 'expanded' | 'compressed';
+    sourceMap?: boolean;
+    sourceMapIncludeSources?: boolean;
+    includePaths?: string[];
+    autoprefixer?: boolean;
+    autoprefixerOptions?: Record<string, any>;
+  };
+  scss?: { // Alternate scss config option
+    includePaths?: string[];
+    sourceMap?: boolean;
+    autoprefixer?: boolean;
+    autoprefixerOptions?: Record<string, any>;
+  };
+  typescript?: {
+    target?: string;
+    format?: string;
+    sourceMap?: boolean;
+    minify?: boolean;
+    bundle?: boolean;
+    external?: string[];
   };
   watch?: {
-    paths: string[];  // Additional paths to watch
-    ignored: string[];// Paths to ignore
+    paths?: string[];
+    ignored?: string[];
   };
-  hotreload?: HotReloadConfig;
-  esbuild?: Record<string, any>; // esbuild options
-  sass?: Record<string, any>;    // sass options
+  hotreload?: {
+    enabled?: boolean;
+    port?: number;
+    host?: string;
+    debounceTime?: number;
+  };
+  esbuild?: BuildOptions;
   postcss?: {
-    plugins: any[];   // PostCSS plugins
+    plugins: any[];
+  };
+  assets?: Record<string, string>;
+  advanced?: {
+    clean?: boolean;
+    parallel?: boolean;
+    verbose?: boolean;
+    hooks?: {
+      beforeBuild?: () => void;
+      afterBuild?: () => void;
+    };
   };
 }
 
-// Builder interface
 export interface Builder {
   build(): Promise<void>;
-  clean(): Promise<void>;
   buildFile(filePath: string): Promise<void>;
+  clean?(): Promise<void>;
+  processChange(filePath: string): Promise<void>;
 }
-
-// Hot reload event types
-export enum HotReloadEventType {
-  CSS_UPDATE = 'css-update',
-  FULL_RELOAD = 'full-reload'
-}
-
-export interface HotReloadEvent {
-  type: HotReloadEventType;
-  path: string;
-}
-
-// CLI command options
-export interface CommandOptions {
-  watch?: boolean;
-  config?: string;
-  clean?: boolean;
-  verbose?: boolean;
-}
-
-export interface HotReloadConfig {
-  port: number;
-  debounceTime: number; // Add debounce time property
-}
-
-// Default configuration
-export const defaultConfig: Partial<IceConfig> = {
-  input: {
-    ts: ['src/**/*.ts', 'src/**/*.tsx'],
-    scss: ['src/**/*.scss', 'src/**/*.sass'],
-  },
-  output: { path: 'dist' },
-  watch: { 
-    paths: ['src'],
-    ignored: ['node_modules', '.git', 'dist']
-  },
-  hotreload: {
-    port: 3001,
-    debounceTime: 300,
-  },
-  esbuild: {},
-  sass: {},
-  postcss: {
-    plugins: []
-  }
-};

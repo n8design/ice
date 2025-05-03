@@ -33,7 +33,7 @@
     "changelog": "node scripts/release.js"
   },
   "dependencies": {
-    "@n8d/ice-hotreloader": "^0.0.1-alpha.18",
+    "@n8d/ice-hotreloader": "^1.0.0",
     "autoprefixer": "^10.4.21",
     "chalk": "^5.4.1",
     "chokidar": "^4.0.3",

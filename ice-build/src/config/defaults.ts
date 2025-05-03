@@ -2,32 +2,21 @@ import { IceConfig } from '../types.js';
 
 export const defaultConfig: Partial<IceConfig> = {
   input: {
-    ts: ['source/**/*.ts', 'source/**/*.tsx', 'src/**/*.ts', 'src/**/*.tsx'],
-    scss: ['source/**/*.scss', 'source/**/*.sass', 'src/**/*.scss', 'src/**/*.sass'],
-    html: ['source/**/*.html', 'src/**/*.html']
+    ts: ['source/**/*.ts', 'source/**/*.tsx'], // Use 'source' as default directory
+    scss: ['source/**/*.scss', 'source/**/*.sass'],
+    html: ['source/**/*.html']
   },
   output: {
-    path: 'public' // Changed from 'dist' to 'public' to match test project
+    path: 'public'
   },
   watch: {
-    paths: ['source', 'src'], // Watch both source and src directories
-    ignored: ['node_modules', '.git', 'public', 'dist']
+    paths: ['source'], // Match with input directory
+    ignored: ['**/node_modules/**']
   },
   hotreload: {
-    port: 3000,
-    debounceTime: 300, // Default 300ms debounce time
-  },
-  esbuild: {
-    bundle: true,
-    minify: true,
-    sourcemap: true,
-    target: 'es2018'
-  },
-  sass: {
-    style: 'expanded',
-    sourceMap: true
-  },
-  postcss: {
-    plugins: [] // Default plugins will be added programmatically
+    enabled: true,
+    port: 3001,  // Ensure port is correctly defined as 3001
+    host: 'localhost',
+    debounceTime: 300
   }
 };

@@ -3,7 +3,7 @@
  */
 
 import { vi } from 'vitest';
-import { IceConfig } from '../../src/interfaces/config.js';
+import { IceConfig } from '../../src/types.js'; // Fix: import from types.js instead of interfaces/config.js
 
 /**
  * Create a mock IceConfig for testing

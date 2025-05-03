@@ -78,6 +78,15 @@ export class TypeScriptBuilder implements Builder {
     }
   }
 
+  /**
+   * Process a file change event
+   * @param filePath Path to the changed file
+   */
+  public async processChange(filePath: string): Promise<void> {
+    // For TypeScript files, we can just call buildFile
+    await this.buildFile(filePath);
+  }
+
   // Add a method to configure plugins including SCSS handling
   private async configurePlugins(): Promise<esbuild.Plugin[]> {
     const plugins: esbuild.Plugin[] = [];
@@ -141,6 +150,12 @@ export class TypeScriptBuilder implements Builder {
     try {
       await fs.access(tsconfigPath);
       logger.info(`Using tsconfig.json from ${tsconfigPath}`);
+      
+      // Read tsconfig to log some key settings for debugging
+      const tsconfigContent = await fs.readFile(tsconfigPath, 'utf-8');
+      const tsconfig = JSON.parse(tsconfigContent);
+      logger.debug(`tsconfig.json settings: target=${tsconfig.compilerOptions?.target}, module=${tsconfig.compilerOptions?.module}`);
+      
       return tsconfigPath;
     } catch {
       logger.warn('No tsconfig.json found, using default TypeScript settings');

@@ -4,9 +4,10 @@
   "description": "Test project for ice-build",
   "type": "module",
   "scripts": {
-    "start": "ice-build --watch",
-    "build": "ice-build --clean",
-    "clean": "rimraf public/*.js public/*.css public/*.map"
+    "start": "ice-build watch",
+    "build": "ice-build build --clean",
+    "test": "echo \"No tests configured\"",
+    "clean": "rimraf dist/**/*"
   },
   "devDependencies": {
     "@n8d/ice-build": "file:../ice-build",

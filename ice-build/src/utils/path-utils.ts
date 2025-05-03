@@ -4,6 +4,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
+import { glob } from 'glob';
 
 /**
  * Normalize path to use forward slashes regardless of platform
@@ -65,4 +66,45 @@ export function getRelativePath(from: string, to: string): string {
  */
 export function isPartial(filePath: string): boolean {
   return path.basename(filePath).startsWith('_');
+}
+
+/**
+ * Resolve a path relative to the project root
+ * @param relativePath Path relative to project root
+ * @returns Absolute path
+ */
+export function resolveProjectPath(relativePath: string): string {
+  return path.resolve(process.cwd(), relativePath);
+}
+
+/**
+ * Get output path based on configuration
+ * @param config Configuration object
+ * @returns Resolved output path
+ */
+export function getOutputPath(config: any): string {
+  if (typeof config.output === 'string') {
+    return resolveProjectPath(config.output);
+  } else if (config.output && typeof config.output === 'object' && 'path' in config.output) {
+    return resolveProjectPath(config.output.path);
+  }
+  return resolveProjectPath('dist'); // Default fallback
+}
+
+/**
+ * Find files matching patterns with cross-platform safety
+ * @param patterns Glob patterns to match
+ * @param options Options for glob
+ * @returns Array of matching file paths
+ */
+export async function findFiles(patterns: string[], options = {}): Promise<string[]> {
+  const results: string[] = [];
+  
+  for (const pattern of patterns) {
+    // Use glob with normalization
+    const matches = await glob(normalizePath(pattern), options);
+    results.push(...matches.map(p => normalizePath(p)));
+  }
+  
+  return results;
 }
