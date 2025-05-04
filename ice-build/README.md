@@ -28,7 +28,7 @@ Ice Build requires the following peer dependencies:
 
 ```bash
 # Install required peer dependencies
-npm install @n8d/ice-hotreloader@^0.0.1 --save-dev
+npm install @n8d/ice-hotreloader@^0.0.1 autoprefixer --save-dev
 ```
 
 The following dependencies are bundled with ice-build and don't need separate installation:
