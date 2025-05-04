@@ -22,6 +22,21 @@ npm install @n8d/ice-build --save-dev
 yarn add @n8d/ice-build --dev
 ```
 
+### Peer Dependencies
+
+Ice Build requires the following peer dependencies:
+
+```bash
+# Install required peer dependencies
+npm install @n8d/ice-hotreloader@^0.0.1 --save-dev
+```
+
+The following dependencies are bundled with ice-build and don't need separate installation:
+- esbuild (TypeScript compilation)
+- sass (SCSS/SASS compilation)
+- postcss & autoprefixer (CSS post-processing)
+- chokidar (File watching)
+
 ## Usage
 
 ### CLI Commands
