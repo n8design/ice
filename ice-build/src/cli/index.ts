@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { registerBuildCommand } from './commands/build.js';
 import { registerWatchCommand } from './commands/watch.js';
 import { checkDirectories } from './commands/check-dirs.js';
+import { registerExportGraphCommand } from './commands/export-graph.js';
 
 /**
  * Create and configure the CLI program
@@ -19,6 +20,7 @@ export function createCLI(): Command {
   registerBuildCommand(program);
   registerWatchCommand(program);
   registerCheckCommand(program);
+  registerExportGraphCommand(program);
   
   return program;
 }

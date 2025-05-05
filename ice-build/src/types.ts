@@ -70,6 +70,21 @@ export interface IceConfig {
    * Setting to false disables the output directory watcher
    */
   watchOutput?: boolean;
+  
+  /**
+   * Graph export configuration
+   */
+  graph?: {
+    /**
+     * Output format for the dependency graph
+     */
+    format?: 'json' | 'dot' | 'nx' | 'all';
+    /**
+     * Custom output path for graph files
+     * Defaults to [output.path]/graphs/
+     */
+    outputPath?: string;
+  };
 }
 
 export interface Builder {

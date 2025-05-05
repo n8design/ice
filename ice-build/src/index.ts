@@ -42,5 +42,4 @@ if (typeof require !== 'undefined' && require.main === module) {
 export type { 
   IceConfig,
   Builder as BuilderInterface, // Export the Builder interface with a different name
-  // Include other types you need from types.js but avoid Builder
 } from './types.js';

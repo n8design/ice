@@ -1,0 +1,380 @@
+{
+  "graph": {
+    "nodes": {
+      "ice-hotreloader": {
+        "name": "ice-hotreloader",
+        "type": "lib",
+        "data": {
+          "root": "ice-hotreloader",
+          "name": "ice-hotreloader",
+          "tags": [
+            "npm:public",
+            "npm:patternlab",
+            "npm:hmr",
+            "npm:hot-reload"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "build:node",
+                "build:browser",
+                "test",
+                "test:integration",
+                "test:watch"
+              ]
+            },
+            "js": {
+              "packageName": "@n8d/ice-hotreloader",
+              "packageExports": {
+                ".": {
+                  "types": "./dist/index.d.ts",
+                  "import": "./dist/index.js",
+                  "require": "./dist/index.js"
+                },
+                "./server": {
+                  "types": "./dist/server/index.d.ts",
+                  "import": "./dist/server/index.js",
+                  "require": "./dist/server/index.js"
+                },
+                "./client": {
+                  "types": "./dist/client/index.d.ts",
+                  "import": "./dist/client/index.js",
+                  "require": "./dist/client/index.js"
+                },
+                "./browser": {
+                  "types": "./dist/browser.d.ts",
+                  "import": "./dist/browser.min.js",
+                  "require": "./dist/browser.min.js"
+                }
+              },
+              "packageMain": "dist/index.js",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "build:node": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "build:node"
+              },
+              "metadata": {
+                "scriptContent": "tsc",
+                "runCommand": "npm run build:node"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "build:browser": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "build:browser"
+              },
+              "metadata": {
+                "scriptContent": "esbuild src/browser.ts --bundle --minify --sourcemap --outfile=dist/browser.min.js --format=iife --target=es2020",
+                "runCommand": "npm run build:browser"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test"
+              },
+              "metadata": {
+                "scriptContent": "vitest run",
+                "runCommand": "npm run test"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:integration": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:integration"
+              },
+              "metadata": {
+                "scriptContent": "echo 'Integration tests not implemented yet' && exit 0",
+                "runCommand": "npm run test:integration"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:watch": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:watch"
+              },
+              "metadata": {
+                "scriptContent": "vitest",
+                "runCommand": "npm run test:watch"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "nx-release-publish": {
+              "executor": "@nx/js:release-publish",
+              "dependsOn": [
+                "build"
+              ],
+              "options": {
+                "packageRoot": "ice-hotreloader",
+                "publishable": true,
+                "access": "public"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "npm run build",
+                "cwd": "ice-hotreloader"
+              },
+              "outputs": [
+                "{projectRoot}/dist"
+              ],
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "cache": true
+            },
+            "lint": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "npm run lint",
+                "cwd": "ice-hotreloader"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true
+            },
+            "version": {
+              "executor": "@nx/release:semantic-version",
+              "options": {
+                "preset": "conventional",
+                "trackDeps": false,
+                "push": true,
+                "skipCommitTypes": [
+                  "chore",
+                  "docs"
+                ],
+                "changelogHeader": "# Changelog",
+                "releaseTagPattern": "ice-hotreloader@{version}",
+                "commitMessageFormat": "chore(release): ice-hotreloader@{version} [skip ci]",
+                "github": {
+                  "release": false
+                },
+                "git": {
+                  "commit": true,
+                  "tag": true,
+                  "push": true
+                },
+                "changelog": {
+                  "create": true,
+                  "file": "CHANGELOG.md",
+                  "scopes": [
+                    "ice-hotreloader"
+                  ]
+                }
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "$schema": "../node_modules/nx/schemas/project-schema.json",
+          "projectType": "library",
+          "sourceRoot": "src",
+          "implicitDependencies": []
+        }
+      },
+      "ice-build": {
+        "name": "ice-build",
+        "type": "lib",
+        "data": {
+          "root": "ice-build",
+          "name": "ice-build",
+          "tags": [
+            "npm:public"
+          ],
+          "metadata": {
+            "targetGroups": {
+              "NPM Scripts": [
+                "watch",
+                "clean",
+                "test",
+                "test:integration",
+                "prepublishOnly",
+                "changelog"
+              ]
+            },
+            "js": {
+              "packageName": "@n8d/ice-build",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "targets": {
+            "watch": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "watch"
+              },
+              "metadata": {
+                "scriptContent": "tsc --watch",
+                "runCommand": "npm run watch"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "clean": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "clean"
+              },
+              "metadata": {
+                "scriptContent": "rimraf dist",
+                "runCommand": "npm run clean"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test"
+              },
+              "metadata": {
+                "scriptContent": "vitest run",
+                "runCommand": "npm run test"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "test:integration": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "test:integration"
+              },
+              "metadata": {
+                "scriptContent": "node tests/integration/run.js",
+                "runCommand": "npm run test:integration"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "prepublishOnly": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "prepublishOnly"
+              },
+              "metadata": {
+                "scriptContent": "npm run build",
+                "runCommand": "npm run prepublishOnly"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "changelog": {
+              "executor": "nx:run-script",
+              "options": {
+                "script": "changelog"
+              },
+              "metadata": {
+                "scriptContent": "node scripts/release.js",
+                "runCommand": "npm run changelog"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "nx-release-publish": {
+              "executor": "@nx/js:release-publish",
+              "dependsOn": [
+                "build"
+              ],
+              "options": {
+                "packageRoot": "ice-build",
+                "publishable": true
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "npm run build",
+                "cwd": "ice-build"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": [
+                "^build"
+              ],
+              "outputs": [
+                "{projectRoot}/dist"
+              ],
+              "cache": true
+            },
+            "lint": {
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "npm run lint",
+                "cwd": "ice-build"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "cache": true
+            },
+            "version": {
+              "executor": "@nx/release:semantic-version",
+              "options": {
+                "preset": "conventional",
+                "trackDeps": false,
+                "push": true,
+                "skipCommitTypes": [
+                  "chore",
+                  "docs"
+                ],
+                "changelogHeader": "# Changelog",
+                "releaseTagPattern": "ice-build@{version}",
+                "commitMessageFormat": "chore(release): ice-build@{version} [skip ci]",
+                "github": {
+                  "release": false
+                },
+                "git": {
+                  "commit": true,
+                  "tag": true,
+                  "push": true
+                },
+                "changelog": {
+                  "create": true,
+                  "file": "CHANGELOG.md",
+                  "scopes": [
+                    "ice-build"
+                  ]
+                }
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "$schema": "../node_modules/nx/schemas/project-schema.json",
+          "projectType": "library",
+          "sourceRoot": "src",
+          "implicitDependencies": []
+        }
+      }
+    },
+    "dependencies": {
+      "ice-hotreloader": [],
+      "ice-build": [
+        {
+          "source": "ice-build",
+          "target": "ice-hotreloader",
+          "type": "static"
+        }
+      ]
+    }
+  }
+}

@@ -18,5 +18,8 @@ export const defaultConfig: Partial<IceConfig> = {
     port: 3001,  // Ensure port is correctly defined as 3001
     host: 'localhost',
     debounceTime: 300
+  },
+  graph: {
+    format: 'json'
   }
 };

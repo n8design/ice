@@ -244,7 +244,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
       this.dumpDependencyGraph();
       
       logger.success(`Dependency graph built with ${this.dependencyGraph.size} nodes`);
-      return this.dependencyGraph;
+      return this.dependencyGraph
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`Error building dependency graph: ${errorMessage}`);
@@ -1029,5 +1029,42 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     } catch (error) {
       logger.error(`Error processing SCSS file: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  /**
+   * Get the SCSS dependency graph
+   * @returns A map of file paths to their dependencies
+   */
+  public getDependencyGraph(): Record<string, string[]> {
+    // Convert the Map<string, SassDependency> to Record<string, string[]>
+    const graphRecord: Record<string, string[]> = {};
+    
+    // If the dependency graph exists, convert it
+    if (this.dependencyGraph) {
+      // Convert Map to Record
+      if (this.dependencyGraph instanceof Map) {
+        for (const [file, dependency] of this.dependencyGraph.entries()) {
+          // Use the 'uses' property which contains what this file imports/depends on
+          graphRecord[file] = Array.from(dependency.uses || new Set<string>());
+        }
+      } 
+      // Handle if it's already a plain object with a different structure
+      else if (typeof this.dependencyGraph === 'object') {
+        for (const [file, dependency] of Object.entries(this.dependencyGraph)) {
+          // Need to check and handle different potential structures
+          // Use type assertion to access properties safely
+          const dep = dependency as any;
+          if (dep && dep.uses && dep.uses instanceof Set) {
+            graphRecord[file] = Array.from(dep.uses);
+          } else if (Array.isArray(dep)) {
+            graphRecord[file] = dep;
+          } else {
+            graphRecord[file] = [];
+          }
+        }
+      }
+    }
+    
+    return graphRecord;
   }
 }
