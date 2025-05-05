@@ -63,7 +63,19 @@ jobs:
     - name: Install dependencies
       run: npm install
       timeout-minutes: 10
+      
+    # Build dependencies in correct order first
+    - name: Build ice-hotreloader (dependency first)
+      run: npm run build --workspace=@n8d/ice-hotreloader
+      timeout-minutes: 10
+      env:
+        NODE_OPTIONS: --max-old-space-size=4096
 
+    # Create package links to ensure dependencies are properly resolved
+    - name: Link workspace packages
+      run: npm link --workspaces --force
+      timeout-minutes: 5
+        
     # Replace the separate test commands with the simple command that works locally
     - name: Run tests (same as local environment)
       run: npm run test
@@ -71,7 +83,7 @@ jobs:
       env:
         CI_PLATFORM: ${{ runner.os }}
         NODE_OPTIONS: --max-old-space-size=4096
-      
+        
     # Run additional tests only if the main tests succeed
     - name: Run Linting
       if: success() # Only run if tests passed
