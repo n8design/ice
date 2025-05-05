@@ -1,9 +1,9 @@
 name: Clean up old workflow runs
 
 on:
+  workflow_dispatch: # This allows manual triggering
   schedule:
     - cron: '0 0 * * 0'  # Run at 00:00 UTC every Sunday
-  workflow_dispatch:  # Allow manual triggering from GitHub UI
 
 jobs:
   cleanup:
@@ -12,5 +12,6 @@ jobs:
       - name: Delete old workflow runs
         uses: Mattraks/delete-workflow-runs@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           retain_days: 14
           keep_minimum_runs: 6
