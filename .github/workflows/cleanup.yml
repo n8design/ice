@@ -1,0 +1,34 @@
+name: Delete failed workflow runs
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Number of days to keep workflow runs'
+        required: true
+        default: '30'
+        type: number
+      minimum_runs:
+        description: 'Minimum runs to keep per workflow'
+        required: true
+        default: '6'
+        type: number
+      delete_workflow_pattern:
+        description: 'Name or filename of the workflow (leave empty for all)'
+        required: false
+        type: string
+  schedule:
+    - cron: '0 0 * * 0'  # Run at 00:00 UTC every Sunday
+
+jobs:
+  delete_runs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: ${{ github.event.inputs.days || 30 }}
+          keep_minimum_runs: ${{ github.event.inputs.minimum_runs || 6 }}
+          delete_workflow_pattern: ${{ github.event.inputs.delete_workflow_pattern || '' }}
