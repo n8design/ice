@@ -43,13 +43,16 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm' # Cache npm dependencies
 
-    - name: Remove all package-lock.json files
+    - name: Remove package-lock.json files (Windows)
+      if: runner.os == 'Windows'
       run: |
-        if [ "$RUNNER_OS" = "Windows" ]; then
-          find . -name "package-lock.json" -type f -exec del {} +
-        else
-          find . -name "package-lock.json" -type f -exec rm -f {} +
-        fi
+        Get-ChildItem -Path . -Filter "package-lock.json" -Recurse | Remove-Item -Force
+      shell: pwsh
+
+    - name: Remove package-lock.json files (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        find . -name "package-lock.json" -type f -exec rm -f {} \;
       shell: bash
 
     - name: Install dependencies
