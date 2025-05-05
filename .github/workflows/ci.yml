@@ -64,7 +64,7 @@ jobs:
       run: npm install
       timeout-minutes: 10
       
-    # Enhanced path handling fix for Windows with correct file paths
+    # Enhanced path handling fix for Windows with module path detection
     - name: Patch path handling tests for Windows
       if: runner.os == 'Windows'
       run: |
@@ -80,13 +80,36 @@ jobs:
         $testFile = $testFiles[0].FullName
         echo "Found test file at: $testFile"
         
+        # First, determine the correct import path by examining existing files
+        $testDir = Split-Path $testFile -Parent
+        $originalContent = Get-Content $testFile -Raw
+        
+        # Extract the actual import path used in the original file using regex
+        $importRegex = [regex]'import\s+\{[\s\w,]*FileWatcher[\s\w,]*\}\s+from\s+[''"]([^''"]+)[''"]'
+        $importMatch = $importRegex.Match($originalContent)
+        
+        if ($importMatch.Success) {
+            $actualImportPath = $importMatch.Groups[1].Value
+            echo "Found actual module import path: $actualImportPath"
+        } else {
+            # Look for the actual FileWatcher.js/ts file
+            $fileWatcherFiles = Get-ChildItem -Path . -Recurse -Filter "*file-watcher*" | Where-Object { $_.Name -match '\.(ts|js)$' }
+            if ($fileWatcherFiles.Count -gt 0) {
+                echo "Found potential FileWatcher files:"
+                $fileWatcherFiles | ForEach-Object { echo "  $($_.FullName)" }
+            }
+            # Default to the path in the original test
+            $actualImportPath = "../../src/watcher/file-watcher.js"
+            echo "Using default import path: $actualImportPath"
+        }
+        
         # Back up the original file
         Copy-Item $testFile "$testFile.bak"
         
-        # Create new file content with path normalization
-        $windowsCompatibleTest = @'
+        # Create new file content with path normalization and the correct import path
+        $windowsCompatibleTest = @"
         import { describe, it, expect, vi, beforeEach } from 'vitest';
-        import { FileWatcher } from '../../src/watcher/file-watcher';
+        import { FileWatcher } from '$actualImportPath';
         import path from 'path';
 
         // Mock dependencies
@@ -183,12 +206,16 @@ jobs:
             expect(mockLogger.error).toHaveBeenCalled();
           });
         });
-        '@
+        "@
 
-        # Write the new file - no indentation in the heredoc
-        $windowsCompatibleTest | Out-File -FilePath $testFile -Encoding utf8
-        
-        echo "Created Windows-compatible test file at: $testFile"
+                # Write the new file
+                $windowsCompatibleTest | Out-File -FilePath $testFile -Encoding utf8
+                
+                echo "Created Windows-compatible test file at: $testFile with import path: $actualImportPath"
+
+        # Verify file exists with dir listing
+        echo "Directory contents:"
+        Get-ChildItem (Split-Path $testFile -Parent)
       shell: pwsh
       
     # Build dependencies in correct order first
