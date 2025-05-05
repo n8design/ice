@@ -1,8 +1,18 @@
-name: Delete failed workflow runs
+name: Delete workflow runs
 
 on:
   workflow_dispatch:
     inputs:
+      status:
+        description: 'Status of runs to delete (completed, failure, success, all)'
+        required: true
+        default: 'failure'
+        type: choice
+        options:
+          - all
+          - failure
+          - success
+          - completed
       days:
         description: 'Number of days to keep workflow runs'
         required: true
@@ -32,3 +42,4 @@ jobs:
           retain_days: ${{ github.event.inputs.days || 30 }}
           keep_minimum_runs: ${{ github.event.inputs.minimum_runs || 6 }}
           delete_workflow_pattern: ${{ github.event.inputs.delete_workflow_pattern || '' }}
+          delete_run_by_conclusion_pattern: ${{ github.event.inputs.status || 'failure' }}
