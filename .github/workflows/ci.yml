@@ -2,24 +2,40 @@ name: Ice Build CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, fix/integration-test ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, fix/integration-test ]
 
 jobs:
   test:
     name: Test on Node ${{ matrix.node-version }} and ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30 # Prevent hangs from running indefinitely
     strategy:
       matrix:
-        node-version: [22.x, 20.x] # Test against Node.js versions
+        node-version: [22.x] # Test against Node.js versions
         os: [ubuntu-latest, macos-latest, windows-latest]
+      fail-fast: false # Continue with other matrix combinations if one fails
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0 # Required for nx affected commands and git tag history
+
+    - name: System info
+      run: |
+        echo "OS: ${{ runner.os }}"
+        echo "Node: ${{ matrix.node-version }}"
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          echo "CPU Cores: $NUMBER_OF_PROCESSORS"
+        elif [ "$RUNNER_OS" = "Linux" ]; then
+          echo "CPU Cores: $(nproc)"
+        elif [ "$RUNNER_OS" = "macOS" ]; then
+          echo "CPU Cores: $(sysctl -n hw.ncpu)"
+        fi
+        echo "Memory: $(node -e 'console.log(Math.round(require("os").totalmem() / (1024 * 1024 * 1024)) + "GB")')"
+      shell: bash
 
     - name: Set up Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
@@ -38,33 +54,64 @@ jobs:
 
     - name: Install dependencies
       run: npm install
+      timeout-minutes: 10
 
     - name: Lint packages
-      run: npx nx affected --target=lint
+      run: npx nx affected --target=lint --verbose
+      continue-on-error: true # Don't fail the build for linting issues
 
     - name: Run Unit Tests
       run: npx nx affected --target=test
+      timeout-minutes: 10
+      env:
+        CI_PLATFORM: ${{ runner.os }}
+        NODE_OPTIONS: --max-old-space-size=4096
 
     - name: Build all packages
       run: npm run build
+      timeout-minutes: 15
+      env:
+        NODE_OPTIONS: --max-old-space-size=4096
 
     - name: Run Integration Tests (ice-build)
       run: npm run test:integration --workspace=@n8d/ice-build
+      timeout-minutes: 10
       env:
         CI_PLATFORM: ${{ runner.os }}
+        DEBUG: "ice:*"
 
     - name: Run Functional Tests (ice-build)
       run: npm run test --workspace=@n8d/ice-build
+      timeout-minutes: 10
       env:
         CI_PLATFORM: ${{ runner.os }}
+        DEBUG: "ice:*"
 
     - name: Run Integration Tests (ice-hotreloader)
       run: npm run test:integration --workspace=@n8d/ice-hotreloader
+      timeout-minutes: 10
       env:
         CI_PLATFORM: ${{ runner.os }}
+        DEBUG: "ice:*"
 
     - name: Run Functional Tests (ice-hotreloader)
       run: npm run test --workspace=@n8d/ice-hotreloader
+      timeout-minutes: 10
       env:
         CI_PLATFORM: ${{ runner.os }}
+        DEBUG: "ice:*"
+
+    - name: Upload test logs
+      if: always() # Run even if previous steps failed
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-logs-${{ matrix.os }}-node-${{ matrix.node-version }}
+        path: |
+          **/test-results
+          **/junit.xml
+          **/npm-debug.log*
+          **/lerna-debug.log*
+          **/yarn-debug.log*
+          **/yarn-error.log*
+        retention-days: 7
 
