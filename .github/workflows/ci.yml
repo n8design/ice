@@ -64,19 +64,21 @@ jobs:
       run: npm install
       timeout-minutes: 10
       
-    # Enhanced path handling fix for Windows
+    # Enhanced path handling fix for Windows with correct file paths
     - name: Patch path handling tests for Windows
       if: runner.os == 'Windows'
       run: |
         echo "Creating Windows-compatible test file..."
-        $testFile = "packages/ice-build/tests/watcher/file-watcher-edge-cases.test.ts"
         
-        # First check if the file exists
-        if (-not (Test-Path $testFile)) {
-          echo "Cannot find test file, searching..."
-          Get-ChildItem -Path . -Recurse -Filter "file-watcher-edge-cases.test.ts" | ForEach-Object { echo "Found at: $($_.FullName)" }
+        # Search for the actual file location
+        $testFiles = Get-ChildItem -Path . -Recurse -Filter "file-watcher-edge-cases.test.ts"
+        if ($testFiles.Count -eq 0) {
+          echo "Cannot find test file"
           exit 1
         }
+        
+        $testFile = $testFiles[0].FullName
+        echo "Found test file at: $testFile"
         
         # Back up the original file
         Copy-Item $testFile "$testFile.bak"
@@ -183,10 +185,10 @@ jobs:
         });
         '@
 
-        # Write the new file
+        # Write the new file - no indentation in the heredoc
         $windowsCompatibleTest | Out-File -FilePath $testFile -Encoding utf8
         
-        echo "Created Windows-compatible test file"
+        echo "Created Windows-compatible test file at: $testFile"
       shell: pwsh
       
     # Build dependencies in correct order first
