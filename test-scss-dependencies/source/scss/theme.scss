@@ -1,0 +1,30 @@
+// Modern Sass modules with explicit namespaces and color functions
+@use 'sass:color';
+@use 'variables' as v;
+@use 'abstracts/colors' as c;
+@use 'abstracts/typography' as t;
+@use 'shared-partial';
+@use 'components/test-component' as tcomp;
+
+// Theme-specific styles
+body.theme-dark {
+  background-color: c.$dark-background;
+  color: c.$light-text;
+
+  .card {
+    border-color: c.$dark-border;
+    background-color: c.$dark-card-bg;
+  }
+
+  .button {
+    &--primary {
+      // Use color.adjust instead of darken
+      background-color: color.adjust(c.$primary-color, $lightness: -10%);
+    }
+    
+    &--secondary {
+      // Use color.adjust instead of darken
+      background-color: color.adjust(c.$secondary-color, $lightness: -10%);
+    }
+  }
+}

@@ -63,12 +63,18 @@ export function registerWatchCommand(program: Command): void {
         }
         
         // Create BuildManager
-        const { BuildManager } = buildersModule;
-        if (!BuildManager) {
+        const { Builder } = buildersModule;
+        if (!Builder) {
           throw new Error('BuildManager not found in builders module');
         }
         
-        const buildManager = new BuildManager(config, config.output?.path || 'public');
+        // Only pass the config to the Builder constructor
+        const buildManager = new Builder(config);
+        
+        // Get output directory path
+        const outputDir = typeof config.output === 'string' 
+          ? config.output 
+          : config.output?.path || 'public';
         
         // Initialize hot reload server using the dedicated package
         let hotReloadServer: any = null;
@@ -82,6 +88,11 @@ export function registerWatchCommand(program: Command): void {
               port,
               outputDir
             });
+            
+            // Create and start the output watcher
+            const { OutputWatcher } = await import('../../watcher/output-watcher.js');
+            const outputWatcher = new OutputWatcher(outputDir, hotReloadServer);
+            outputWatcher.start();
             
             logger.success('Hot reload server started');
             logger.info('📝 To enable hot reloading in the browser:');
@@ -108,9 +119,11 @@ export function registerWatchCommand(program: Command): void {
             logger.info('Received SIGINT, shutting down');
             fileWatcher.stop();
             if (hotReloadServer) {
-              // Close the HotReloadServer if it has a close method
-              if (typeof hotReloadServer.close === 'function') {
-                hotReloadServer.close();
+              // Close the HotReloadServer if it has a stop or destroy method
+              if (typeof hotReloadServer.stop === 'function') {
+                hotReloadServer.stop();
+              } else if (typeof hotReloadServer.destroy === 'function') {
+                hotReloadServer.destroy();
               }
             }
             process.exit(0);

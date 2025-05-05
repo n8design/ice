@@ -8,7 +8,6 @@
 // Export from CLI and other modules
 export * from './cli/index.js';
 export * from './builders/index.js';
-export * from './types.js';
 
 // Import the runCLI function (not CLI)
 import { runCLI } from './cli/index.js';
@@ -37,3 +36,11 @@ if (typeof require !== 'undefined' && require.main === module) {
     process.exit(1);
   });
 }
+
+// Fix ambiguous export by explicitly re-exporting only the types we need
+// Instead of general export * from './types.js'
+export type { 
+  IceConfig,
+  Builder as BuilderInterface, // Export the Builder interface with a different name
+  // Include other types you need from types.js but avoid Builder
+} from './types.js';

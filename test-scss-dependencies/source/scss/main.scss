@@ -1,0 +1,27 @@
+// Modern Sass modules with explicit namespaces
+@use 'sass:color';
+@use 'variables' as v;
+@use 'abstracts/colors' as c;
+@use 'abstracts/typography' as t; 
+@use 'components/card';
+@use 'components/buttons/button';
+@use 'shared-partial';
+@use 'abstracts/test-file2';
+@use 'abstracts/test-file3';
+
+body {
+  font-family: t.$font-family;
+  background-color: c.$background-color;
+  color: c.$text-color;
+  padding: 20px;
+  margin: 0;
+}
+
+.info-box {
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid v.$border-color;
+  border-radius: 4px;
+  // Use color.adjust instead of lighten
+  background-color: color.adjust(v.$info-color, $lightness: 40%);
+}

@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "outDir": "./public/js",
+    "rootDir": "./source",
+    "sourceMap": true,
+    "declaration": false,
+    "removeComments": false,
+    "noImplicitAny": true
+  },
+  "include": [
+    "source/**/*.ts",
+    "source/ts/**/*.ts"  // Explicitly include the ts directory
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

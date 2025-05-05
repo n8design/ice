@@ -106,15 +106,26 @@ export function createMockSassGraph() {
         index: {
           'src/_variables.scss': {
             imports: [],
-            importedBy: ['src/style.scss']
+            importedBy: ['src/style.scss', 'src/theme.scss'] // Add multiple importers
           },
           'src/style.scss': {
             imports: ['src/_variables.scss'],
             importedBy: []
+          },
+          'src/theme.scss': { // Add another file that imports _variables.scss
+            imports: ['src/_variables.scss'],
+            importedBy: []
+          },
+          'src/components/_button.scss': { // Add a deeper nested partial
+            imports: ['src/_variables.scss'],
+            importedBy: ['src/style.scss']
           }
         },
         visitAncestors: vi.fn().mockImplementation((file) => {
           if (file.includes('_variables')) {
+            return { 'src/style.scss': true, 'src/theme.scss': true }; // Return all dependent files
+          }
+          if (file.includes('_button')) {
             return { 'src/style.scss': true };
           }
           return {};

@@ -1,6 +1,6 @@
 import * as chokidar from 'chokidar';
 import { IceConfig } from '../types.js';
-import { BuildManager } from '../builders/index.js';
+import { Builder } from '../builders/index.js'; // Changed from BuildManager to Builder
 import { Logger } from '../utils/logger.js';
 import path from 'path';
 // Update import to use the external package
@@ -11,16 +11,16 @@ const logger = new Logger('Watcher');
 export class FileWatcher {
   private static instance: FileWatcher;
   private config: IceConfig;
-  private buildManager: BuildManager;
+  private builder: Builder; // Changed from buildManager to builder
   private hotReloadServer: any; // Using any type for compatibility
   private watcher: chokidar.FSWatcher | null = null;
   private changeTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private debounceTime: number;
 
   // Make constructor private to enforce singleton
-  private constructor(config: IceConfig, buildManager: BuildManager, hotReloadServer: any) {
+  private constructor(config: IceConfig, builder: Builder, hotReloadServer: any) {
     this.config = config;
-    this.buildManager = buildManager;
+    this.builder = builder;
     this.hotReloadServer = hotReloadServer;
     this.debounceTime = config.hotreload?.debounceTime || 300;
   }
@@ -28,9 +28,9 @@ export class FileWatcher {
   /**
    * Get singleton instance
    */
-  public static getInstance(config: IceConfig, buildManager: BuildManager, hotReloadServer: any): FileWatcher {
+  public static getInstance(config: IceConfig, builder: Builder, hotReloadServer: any): FileWatcher {
     if (!FileWatcher.instance) {
-      FileWatcher.instance = new FileWatcher(config, buildManager, hotReloadServer);
+      FileWatcher.instance = new FileWatcher(config, builder, hotReloadServer);
     }
     return FileWatcher.instance;
   }
@@ -98,34 +98,21 @@ export class FileWatcher {
     logger.info(`Processing file: ${filePath}`);
     
     try {
-      const builder = this.buildManager.getBuilderForFile(filePath);
+      const builder = this.builder.getBuilderForFile(filePath);
       if (!builder) {
         logger.warn(`No builder found for file: ${filePath}`);
         return;
       }
       
+      // Process the change but DON'T notify the hot reloader
+      // Let the output watcher handle that
       await builder.processChange(filePath);
       
-      // Send hot reload event if server is available
-      if (this.hotReloadServer) {
-        const ext = path.extname(filePath).toLowerCase();
-        
-        // Adapt to the ice-hotreloader API
-        if (ext === '.css' || ext === '.scss' || ext === '.sass') {
-          // Check which API is available and use it
-          if (typeof this.hotReloadServer.notifyClients === 'function') {
-            this.hotReloadServer.notifyClients('css', filePath);
-          }
-        } else {
-          // For non-CSS files, trigger a full reload
-          if (typeof this.hotReloadServer.notifyClients === 'function') {
-            this.hotReloadServer.notifyClients('full', filePath);
-          }
-        }
-      }
+      // IMPORTANT: Remove the hotReloadServer notification code
+      // The output watcher will handle notifications
       
     } catch (error) {
-      logger.error(`Error processing change for ${filePath}: ${error}`);
+      logger.error(`Error processing change for ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

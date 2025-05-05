@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCSS Dependency Testing</title>
+  <link rel="stylesheet" href="main.css">
+  <link rel="stylesheet" href="theme.css">
+  <!-- Updated to port 3005 -->
+  <script src="http://localhost:3005/ice-hotreload.js"></script>
+</head>
+<body>
+  <h1>SCSS Dependency Testing</h1>
+  
+  <div class="card">
+    <div class="card__header">Card Header</div>
+    <div class="card__body">
+      This card uses various SCSS partials nested at different levels.
+      <button class="button button--primary">Primary Button</button>
+      <button class="button button--secondary">Secondary Button</button>
+    </div>
+  </div>
+  
+  <div class="info-box">
+    <p>Try modifying different partials and see which CSS files get rebuilt:</p>
+    <ol>
+      <li><code>_colors.scss</code> - Should rebuild both main.css and theme.css</li>
+      <li><code>_button.scss</code> - Should rebuild only main.css</li>
+      <li><code>_shared-partial.scss</code> - Should rebuild both CSS files</li>
+    </ol>
+  </div>
+</body>
+</html>

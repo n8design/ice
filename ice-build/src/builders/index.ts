@@ -1,14 +1,15 @@
+import { EventEmitter } from 'events'; // Make sure EventEmitter is imported
 import { IceConfig } from '../types.js';
 import { SCSSBuilder } from './scss.js';
 import { TypeScriptBuilder } from './typescript.js';
 import { Logger } from '../utils/logger.js';
 import path from 'path';
-import { Builder } from '../types.js';
+import { OutputWatcher } from '../watcher/output-watcher.js';
 
 const logger = new Logger('Builder');
 
 // Define an interface for HTMLBuilder to ensure type safety
-interface HTMLBuilderInterface extends Builder {
+interface HTMLBuilderInterface {
   build(): Promise<void>;
   buildFile(filePath: string): Promise<void>;
   processChange(filePath: string): Promise<void>;
@@ -39,32 +40,74 @@ try {
   logger.warn('HTML builder module not found, will use fallback');
 }
 
-export class BuildManager {
+export class Builder extends EventEmitter {
   private config: IceConfig;
   private outputPath: string;
   private tsBuilder: TypeScriptBuilder;
   private scssBuilder: SCSSBuilder;
   private htmlBuilder: HTMLBuilderInterface;
+  private outputWatcher: OutputWatcher | null = null;
+  private hotReloadServer: any = null; // Add reference to the hotReloader
 
-  constructor(config: IceConfig, outputPath: string) {
+  constructor(config: IceConfig) {
+    super(); // Call EventEmitter constructor
     this.config = config;
-    this.outputPath = outputPath;
+    
+    // Fix the outputPath assignment to handle both string and object format
+    if (typeof config.output === 'string') {
+      this.outputPath = config.output;
+    } else if (config.output && typeof config.output === 'object') {
+      this.outputPath = config.output.path || 'public';
+    } else {
+      this.outputPath = 'public'; // Default
+    }
     
     // Initialize builders
-    this.tsBuilder = new TypeScriptBuilder(config, outputPath);
-    this.scssBuilder = new SCSSBuilder(config, outputPath);
+    this.tsBuilder = new TypeScriptBuilder(config, this.outputPath);
+    this.scssBuilder = new SCSSBuilder(config, this.outputPath);
     
     // Try to initialize HTML builder safely
     try {
       if (htmlBuilderModule.HTMLBuilder) {
-        this.htmlBuilder = new htmlBuilderModule.HTMLBuilder(config, outputPath);
+        this.htmlBuilder = new htmlBuilderModule.HTMLBuilder(config, this.outputPath);
       } else {
-        this.htmlBuilder = createFallbackHTMLBuilder(config, outputPath);
+        this.htmlBuilder = createFallbackHTMLBuilder(config, this.outputPath);
       }
     } catch (e) {
       logger.warn(`Failed to initialize HTML builder: ${e instanceof Error ? e.message : String(e)}`);
       // Use the fallback builder
-      this.htmlBuilder = createFallbackHTMLBuilder(config, outputPath);
+      this.htmlBuilder = createFallbackHTMLBuilder(config, this.outputPath);
+    }
+    
+    // Initialize output watcher if enabled in config
+    if (config.watchOutput !== false) {
+      // Fix the path property access issue with proper type checking
+      const outputDir = typeof config.output === 'string' 
+        ? config.output 
+        : (config.output && 'path' in config.output ? config.output.path : 'public');
+        
+      // We'll initialize the output watcher later when we have the hot reload server
+      // Move this code to the setHotReloadServer method
+      this.outputWatcher = null;
+    }
+  }
+
+  // Add method to set the hot reload server
+  public setHotReloadServer(server: any): void {
+    this.hotReloadServer = server;
+    
+    // Now that we have the hot reload server, create the output watcher
+    if (this.hotReloadServer) {
+      // Get output directory
+      const outputDir = typeof this.config.output === 'string' 
+        ? this.config.output 
+        : (this.config.output && 'path' in this.config.output ? this.config.output.path : 'public');
+        
+      // Create output watcher with both required arguments
+      this.outputWatcher = new OutputWatcher(outputDir, this.hotReloadServer);
+      
+      // Start the watcher
+      this.outputWatcher.start();
     }
   }
 
@@ -155,6 +198,20 @@ export class BuildManager {
    */
   public getHtmlBuilder(): HTMLBuilderInterface {
     return this.htmlBuilder;
+  }
+
+  public startWatching(): void {
+    // Start the output watcher if it exists
+    if (this.outputWatcher) {
+      this.outputWatcher.start();
+    }
+  }
+
+  public stopWatching(): void {
+    // Stop the output watcher if it exists
+    if (this.outputWatcher) {
+      this.outputWatcher.stop();
+    }
   }
 }
 

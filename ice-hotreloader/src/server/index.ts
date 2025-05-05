@@ -2,6 +2,8 @@ import { createServer } from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { normalizePath, removeOutputDirPrefix } from '../utils/path-utils.js';
 import { HotReloaderOptions, mergeWithDefaults } from '../utils/config.js';
+import path from 'path';
+import chalk from 'chalk';
 
 // Helper function for getting the current time
 function getCurrentTime(): string {
@@ -64,6 +66,12 @@ export class HotReloadServer {
         const cleanPath = removeOutputDirPrefix(normalizedPath, this.options.outputDir);
         
         try {
+            // CRITICAL FIX: Don't process partial SCSS files
+            if (path.includes('/_') || path.startsWith('_')) {
+                console.log(`🔥 [${getCurrentTime()}] ⚠️ Skipping partial: ${path}`);
+                return;
+            }
+            
             const message = JSON.stringify({ type, path: cleanPath });
             
             // Get the filename from the path for more concise messaging
@@ -91,9 +99,39 @@ export class HotReloadServer {
         }
     }
     
+    // Add method to properly close the server
+    stop(): void {
+        try {
+            this.wss.close();
+            console.log(`🔥 [${getCurrentTime()}] HMR server stopped`);
+        } catch (error) {
+            console.error(`🔥 [${getCurrentTime()}] Error stopping HMR server:`, error);
+        }
+    }
+    
+    // Alias for stop() for compatibility
+    destroy(): void {
+        this.stop();
+    }
+    
+    // Legacy method for backward compatibility
+    close(): void {
+        this.stop();
+    }
+    
     // Legacy method for backward compatibility
     setOutputDir(dir: string): void {
         // Make sure we properly normalize the path
         this.options.outputDir = normalizePath(dir);
+    }
+
+    // Add a new method to handle output file notifications
+    notifyOutputChange(type: 'css' | 'js' | 'html', filePath: string): void {
+        const fileName = path.basename(filePath);
+        
+        console.log(chalk.magenta(`🔥 [${getCurrentTime()}] 📤 Refresh ${type.toUpperCase()}: ${fileName}`));
+        
+        // Use the existing notifyClients method
+        this.notifyClients(type, filePath);
     }
 }

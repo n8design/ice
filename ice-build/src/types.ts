@@ -65,6 +65,11 @@ export interface IceConfig {
       afterBuild?: () => void;
     };
   };
+  /**
+   * Whether to watch the output directory for changes
+   * Setting to false disables the output directory watcher
+   */
+  watchOutput?: boolean;
 }
 
 export interface Builder {

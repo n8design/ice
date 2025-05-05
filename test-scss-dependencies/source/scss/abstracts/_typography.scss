@@ -1,0 +1,15 @@
+// Typography variables and mixins
+$font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+$font-size-base: 16px;
+$line-height-base: 1.5;
+
+@mixin heading {
+  font-weight: bold;
+  line-height: 1.2;
+  margin-top: 0;
+}
+
+@mixin subheading {
+  font-weight: 500;
+  color: lighten($text-color, 20%);
+}

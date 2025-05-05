@@ -11,7 +11,7 @@ Ice Build is a modern, fast, and efficient build tool designed for TypeScript an
 *   **Modern SCSS:** Compiles SCSS/SASS (`.scss`, `.sass`) using the modern Dart Sass implementation.
 *   **Watch Mode:** Monitors files for changes and automatically rebuilds.
 *   **Hot Reloading:** Integrates with `@n8d/ice-hotreloader` for seamless CSS injection and page reloads.
-*   **PostCSS Integration:** Includes Autoprefixer for CSS vendor prefixes.
+*   **PostCSS Integration:** Includes Autoprefixer for CSS vendor prefixes with automatic browserslist configuration discovery.
 *   **Configurable:** Uses an `ice.config.js` file for project-specific settings.
 
 ## Installation
@@ -81,6 +81,11 @@ export default {
     // includePaths: ['node_modules'], // Add paths for @import or @use
     // sourceMap: true, // Enable/disable source maps (default: true for dev, false for prod)
   },
+  // PostCSS options
+  postcss: {
+    // Add custom PostCSS plugins if needed
+    // plugins: [require('cssnano')()]
+  },
   // TypeScript specific options (using esbuild)
   typescript: {
     // target: 'es2020', // esbuild target (default: 'es2020')
@@ -100,55 +105,23 @@ export default {
 };
 ```
 
-### Hot Reloading
+### Browser Compatibility Configuration
 
-The Ice build tool includes a built-in hot reload server that automatically refreshes CSS files without page reloads and reloads the page for HTML/JS changes.
+Ice Build uses Autoprefixer to automatically add vendor prefixes to CSS properties. By default, Autoprefixer uses [browserslist](https://github.com/browserslist/browserslist) to determine which prefixes are needed.
 
-To enable hot reloading:
+You can configure your target browsers by adding a browserslist configuration:
 
-1. Make sure `hotreload.enabled` is set to `true` in your config
-2. Add the client script to your HTML file:
-
-```html
-<!-- Option 1: Auto-injected script from the hot reload server -->
-<script src="http://localhost:3001/ice-hotreload.js"></script>
-
-<!-- Option 2: Manual implementation -->
-<script>
-  const socket = new WebSocket('ws://localhost:3001/ws'); // The default port is 3001
-  
-  socket.addEventListener('message', (event) => {
-    const message = JSON.parse(event.data);
-    console.log('Hot Reload:', message);
-    
-    if (message.type === 'css_update') {
-      // Refresh CSS without page reload
-      document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
-        const url = new URL(link.href);
-        url.searchParams.set('t', Date.now());
-        link.href = url.toString();
-      });
-    } else if (message.type === 'full_reload') {
-      // Full page reload for JS/HTML changes
-      location.reload();
-    }
-  });
-</script>
+1. Add to your `package.json`:
+```json
+{
+  "browserslist": [
+    ">0.3%",
+    "last 2 versions",
+    "not dead"
+  ]
+}
 ```
 
-When files change, you will see messages in the console indicating that CSS updates or full page reloads are being triggered.
-
-## Development
-
-*   **Build:** `npm run build` or `yarn build`
-*   **Watch:** `npm run watch` or `yarn watch`
-*   **Lint:** `npm run lint` or `yarn lint`
-*   **Test:** `npm test` or `yarn test` (Uses **vitest**)
-
-## Contributing
-
-Contributions are welcome! Please follow standard fork-and-pull-request workflow. Ensure tests pass and linting is clean before submitting pull requests.
-
-## License
-
-MIT
+2. Or create a `.browserslistrc` file in your project root:
+````
+`````

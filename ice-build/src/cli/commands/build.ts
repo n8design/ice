@@ -47,8 +47,8 @@ async function executeBuildCommand(): Promise<void> {
       config = await configModuleAny.createConfig() || config;
     }
     
-    // Create builder manager - use 'any' type assertion to avoid errors
-    const buildManager = new BuildManagerModule.BuildManager(config as any, config.output?.path || 'public');
+    // Create builder manager - only pass the config, not the output path
+    const buildManager = new BuildManagerModule.Builder(config as any);
     
     // Build all
     await buildManager.buildAll();

@@ -1,0 +1,76 @@
+.card {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  background-color: white;
+}
+.card__header {
+  font-weight: bold;
+  line-height: 1.2;
+  margin-top: 0;
+  padding: 15px;
+  background-color: rgb(203.6129707113, 228.9267782427, 245.8870292887);
+  border-bottom: 1px solid #ddd;
+}
+.card__body {
+  padding: 15px;
+}
+.card__body .button + .button {
+  margin-left: 10px;
+}
+
+.button {
+  display: inline-block;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.button--primary {
+  background-color: #3498db;
+  color: white;
+}
+.button--primary:hover {
+  background-color: rgb(33.1380753138, 125.1882845188, 186.8619246862);
+}
+.button--secondary {
+  background-color: #2ecc71;
+  color: white;
+}
+.button--secondary:hover {
+  background-color: rgb(36.616, 162.384, 89.948);
+}
+
+.shared-component {
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  color: lime;
+  content: "Hello world";
+}
+
+.helloworld {
+  background-color: block;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f9f9f9;
+  color: #333;
+  padding: 20px;
+  margin: 0;
+}
+
+.info-box {
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: rgb(226.5384615385, 241.5384615385, 253.4615384615);
+}
+/*# sourceMappingURL=main.css.map */
