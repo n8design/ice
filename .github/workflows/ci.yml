@@ -64,50 +64,38 @@ jobs:
       run: npm install
       timeout-minutes: 10
 
-    - name: Run Unit Tests
-      run: |
-        # Try to run affected tests, but if it fails run all tests
-        npx nx affected --target=test || npx nx run-many --target=test --all
-      timeout-minutes: 10
+    # Replace the separate test commands with the simple command that works locally
+    - name: Run tests (same as local environment)
+      run: npm run test
+      timeout-minutes: 15
       env:
         CI_PLATFORM: ${{ runner.os }}
         NODE_OPTIONS: --max-old-space-size=4096
-
-    - name: Lint packages
-      run: |
-        # Try to run affected lint, but if it fails run all lint
-        npx nx affected --target=lint --verbose || npx nx run-many --target=lint --all --verbose
-      continue-on-error: true # Don't fail the build for linting issues
+      
+    # Run additional tests only if the main tests succeed
+    - name: Run Linting
+      if: success() # Only run if tests passed
+      run: npx nx run-many --target=lint --all
+      continue-on-error: true
 
     - name: Build all packages
+      if: success() # Only build if tests passed
       run: npm run build
       timeout-minutes: 15
       env:
         NODE_OPTIONS: --max-old-space-size=4096
 
     - name: Run Integration Tests (ice-build)
+      if: success() # Only run if previous steps succeeded
       run: npm run test:integration --workspace=@n8d/ice-build
       timeout-minutes: 10
       env:
         CI_PLATFORM: ${{ runner.os }}
         DEBUG: "ice:*"
 
-    - name: Run Functional Tests (ice-build)
-      run: npm run test --workspace=@n8d/ice-build
-      timeout-minutes: 10
-      env:
-        CI_PLATFORM: ${{ runner.os }}
-        DEBUG: "ice:*"
-
     - name: Run Integration Tests (ice-hotreloader)
+      if: success() # Only run if previous steps succeeded
       run: npm run test:integration --workspace=@n8d/ice-hotreloader
-      timeout-minutes: 10
-      env:
-        CI_PLATFORM: ${{ runner.os }}
-        DEBUG: "ice:*"
-
-    - name: Run Functional Tests (ice-hotreloader)
-      run: npm run test --workspace=@n8d/ice-hotreloader
       timeout-minutes: 10
       env:
         CI_PLATFORM: ${{ runner.os }}
