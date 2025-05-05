@@ -484,7 +484,6 @@ jobs:
           echo "### Windows-specific test report listing" >> test-summary.md
           echo '```' >> test-summary.md
           find . -name "*.xml" 2>/dev/null || echo "No XML files found via find"
-          dir /s /b *.xml 2> nul || echo "No XML files found via dir"
           echo '```' >> test-summary.md
         fi
         
@@ -511,6 +510,40 @@ jobs:
         echo "- OS: ${{ runner.os }}" >> test-summary.md
         echo "- Node: ${{ matrix.node-version }}" >> test-summary.md
       shell: bash
+      continue-on-error: true
+
+    # Add a dedicated Windows XML file listing step using PowerShell
+    - name: Windows XML Report Listing
+      if: runner.os == 'Windows'
+      run: |
+        echo "### Windows PowerShell XML Report Listing" >> test-summary.md
+        echo '```' >> test-summary.md
+        
+        $xmlFiles = Get-ChildItem -Path . -Include "*.xml" -Recurse
+        
+        if ($xmlFiles.Count -eq 0) {
+          Write-Output "No XML files found with PowerShell Get-ChildItem"
+        } else {
+          Write-Output "Found $($xmlFiles.Count) XML files:"
+          foreach ($file in $xmlFiles) {
+            Write-Output "- $($file.FullName)"
+            Add-Content -Path test-summary.md -Value "- $($file.FullName)"
+            
+            # Try to extract test counts from XML
+            try {
+              [xml]$xmlContent = Get-Content -Path $file.FullName
+              $testCount = ($xmlContent.SelectNodes("//testcase") | Measure-Object).Count
+              $failureCount = ($xmlContent.SelectNodes("//failure") | Measure-Object).Count
+              Write-Output "  Tests: $testCount, Failures: $failureCount"
+              Add-Content -Path test-summary.md -Value "  Tests: $testCount, Failures: $failureCount"
+            } catch {
+              Write-Output "  Could not parse XML file"
+            }
+          }
+        }
+        
+        echo '```' >> test-summary.md
+      shell: pwsh
       continue-on-error: true
 
     # Update artifact upload with more specific paths and additional logs
