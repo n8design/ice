@@ -23,6 +23,11 @@ jobs:
       with:
         fetch-depth: 0 # Required for nx affected commands and git tag history
 
+    - name: Fetch main branch
+      run: git fetch origin main:main || echo "Main branch not found, will run all tests"
+      shell: bash
+      continue-on-error: true
+
     - name: System info
       run: |
         echo "OS: ${{ runner.os }}"
@@ -59,16 +64,20 @@ jobs:
       run: npm install
       timeout-minutes: 10
 
-    - name: Lint packages
-      run: npx nx affected --target=lint --verbose
-      continue-on-error: true # Don't fail the build for linting issues
-
     - name: Run Unit Tests
-      run: npx nx affected --target=test
+      run: |
+        # Try to run affected tests, but if it fails run all tests
+        npx nx affected --target=test || npx nx run-many --target=test --all
       timeout-minutes: 10
       env:
         CI_PLATFORM: ${{ runner.os }}
         NODE_OPTIONS: --max-old-space-size=4096
+
+    - name: Lint packages
+      run: |
+        # Try to run affected lint, but if it fails run all lint
+        npx nx affected --target=lint --verbose || npx nx run-many --target=lint --all --verbose
+      continue-on-error: true # Don't fail the build for linting issues
 
     - name: Build all packages
       run: npm run build
