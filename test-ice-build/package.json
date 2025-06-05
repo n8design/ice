@@ -20,5 +20,8 @@
     "rimraf": "^5.0.1",
     "sass": "^1.62.1",
     "typescript": "^5.0.4"
+  },
+  "dependencies": {
+    "@n8d/htwoo-core": "^2.7.1"
   }
 }

@@ -978,6 +978,18 @@ export class SCSSBuilder extends EventEmitter implements Builder {
           );
         }
         
+        // console.log(scssConfig);
+        // console.log('Sass loadPaths: Before', includePaths);
+        
+        includePaths.push(...this.getNodeModulesPaths());
+
+        // Right before the sass.compile call, add:
+        includePaths.push(
+          path.resolve(process.cwd(), 'node_modules')
+        );
+
+        console.log('Sass loadPaths: After', includePaths);
+
         const result = sass.compile(absolutePath, {
           style: sassStyle,
           sourceMap: useSourceMap,
@@ -1066,5 +1078,22 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     }
     
     return graphRecord;
+  }
+
+  /**
+   * Get all potential node_modules directories in the module resolution chain
+   * Similar to module.paths in CommonJS
+   */
+  private getNodeModulesPaths(): string[] {
+    const paths: string[] = [];
+    let currentDir = process.cwd();
+    
+    // Walk up the directory tree to find all node_modules folders
+    while (currentDir !== path.parse(currentDir).root) {
+      paths.push(path.join(currentDir, 'node_modules'));
+      currentDir = path.dirname(currentDir);
+    }
+    
+    return paths;
   }
 }

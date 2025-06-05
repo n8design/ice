@@ -2,7 +2,6 @@
  * Ice Build Sample Configuration
  * A real-world configuration example with common settings
  */
-
 export default {
   // Define input sources
   input: {
@@ -35,7 +34,7 @@ export default {
   // SCSS specific options
   scss: {
     // Add node_modules to the include path for @import or @use
-    includePaths: ['node_modules'],
+    includePaths: ['node_modules', ...module.paths],
     sourceMap: true,
     autoprefixer: true,
     
