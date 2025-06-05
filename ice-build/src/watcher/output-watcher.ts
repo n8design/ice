@@ -13,13 +13,15 @@ const logger = new Logger('OutputWatcher');
  * - You can exclude certain file types from triggering hot reload by specifying an array of extensions in
  *   `config.hotreload.excludeExtensions` (e.g., ['.map', '.txt']).
  * - When a file changes, if its extension is in the exclude list, it will be ignored and not trigger a reload.
- * - If the file is a .css file, the watcher will call `refreshCSS` on the hot reload server with the relative path.
- * - For all other file types, the watcher will call `reload` on the hot reload server.
+ * - If the file is a .css file, the watcher will call `notifyClients` on the hot reload server with type 'css'.
+ * - For .js files and .html files, the watcher will call `notifyClients` with type 'full'.
+ * - Files starting with underscore (_) or dot (.) are skipped as they are typically partials or temporary files.
  */
 export class OutputWatcher {
+  private watcher: chokidar.FSWatcher | null = null;
   private outputDir: string;
-  private hotReloadServer: any;
-  private watcher: chokidar.FSWatcher | null;
+  private isWatching = false;
+  private hotReloadServer: HotReloadServer;
   private config: any;
   private logger: Logger;
 
@@ -29,49 +31,44 @@ export class OutputWatcher {
    * @param hotReloadServer The hot reload server to notify
    * @param config Optional configuration object
    */
-  constructor(outputDir: string, hotReloadServer: any, config: any = {}) {
+  constructor(outputDir: string, hotReloadServer: HotReloadServer, config: any = {}) {
     this.outputDir = outputDir;
     this.hotReloadServer = hotReloadServer;
-    this.watcher = null;
     this.config = config;
     this.logger = new Logger('OutputWatcher');
+    logger.debug(`OutputWatcher initialized for directory: ${outputDir}`);
   }
 
   /**
    * Start watching the output directory
    */
   public start(): void {
-    this.logger.info(`Watching output directory: ${this.outputDir}`);
+    if (this.isWatching) {
+      return;
+    }
+
+    this.logger.info(`Starting to watch output directory: ${this.outputDir}`);
 
     // Initialize the watcher
     this.watcher = chokidar.watch(this.outputDir, {
-      ignoreInitial: true,
+      ignored: [
+        '**/.*', // Ignore dot files using a glob pattern string
+        '**/node_modules/**' // Ignore node_modules
+      ],
+      persistent: true,
+      ignoreInitial: true, // Don't emit events for initial scan
       awaitWriteFinish: {
         stabilityThreshold: 100, // Wait for file to stabilize for 100ms
         pollInterval: 100
       }
     });
 
-    this.watcher.on('change', (filePath: string) => {
-      // Check if this file type should be excluded
-      const ext = path.extname(filePath).toLowerCase();
-      if (this.config?.hotreload?.excludeExtensions?.includes(ext)) {
-        this.logger.debug(`Skipping excluded file: ${path.basename(filePath)}`);
-        return; // Skip excluded extensions
-      }
+    // Watch for file changes (add/change)
+    this.watcher.on('add', this.handleFileChange.bind(this));
+    this.watcher.on('change', this.handleFileChange.bind(this));
 
-      const relativePath = path.relative(this.outputDir, filePath);
-      this.logger.info(`Output file changed: ${relativePath}`);
-
-      // Notify hot reload server of the change
-      if (this.hotReloadServer) {
-        if (ext === '.css') {
-          this.hotReloadServer.refreshCSS(relativePath);
-        } else {
-          this.hotReloadServer.reload();
-        }
-      }
-    });
+    this.isWatching = true;
+    logger.success('Output directory watcher started');
   }
 
   /**
@@ -81,7 +78,40 @@ export class OutputWatcher {
     if (this.watcher) {
       this.watcher.close();
       this.watcher = null;
-      this.logger.info('Output watching stopped');
+      this.isWatching = false;
+      this.logger.info('Output directory watcher stopped');
+    }
+  }
+
+  /**
+   * Handle file changes in the output directory
+   * @param filePath Path to the changed file
+   */
+  private handleFileChange(filePath: string): void {
+    const ext = path.extname(filePath).toLowerCase();
+    const fileName = path.basename(filePath);
+
+    // Skip partials and temp files
+    if (fileName.startsWith('_') || fileName.startsWith('.')) {
+      return;
+    }
+
+    // Check if this file type should be excluded via config
+    if (this.config?.hotreload?.excludeExtensions?.includes(ext)) {
+      this.logger.debug(`Skipping excluded file: ${fileName}`);
+      return; // Skip excluded extensions
+    }
+
+    // Handle different file types
+    if (ext === '.css') {
+      this.logger.info(`Detected CSS change in output: ${fileName}`);
+      this.hotReloadServer.notifyClients('css', filePath);
+    } else if (ext === '.js') {
+      this.logger.info(`Detected JS change in output: ${fileName}`);
+      this.hotReloadServer.notifyClients('full', filePath);
+    } else if (ext === '.html' || ext === '.htm') {
+      this.logger.info(`Detected HTML change in output: ${fileName}`);
+      this.hotReloadServer.notifyClients('full', filePath);
     }
   }
 }
