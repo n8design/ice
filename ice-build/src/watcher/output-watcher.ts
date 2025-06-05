@@ -96,21 +96,28 @@ export class OutputWatcher {
       return;
     }
 
-    // Explicitly handle HTML, HTM, and HBS files in every case
-    // This ensures they're always excluded if listed in excludeExtensions
-    if (ext === '.html' || ext === '.htm' || ext === '.hbs') {
+    // Special handling for HTML, HTM, and HBS files
+    // Always check these first to prevent reload of these file types
+    const htmlExtensions = ['.html', '.htm', '.hbs'];
+    if (htmlExtensions.includes(ext)) {
       const excludeExtensions = this.config?.hotreload?.excludeExtensions || [];
       
-      // Check if extension should be excluded
-      const extensionsToCheck = ['.html', '.htm', '.hbs'];
-      const shouldExclude = extensionsToCheck.some(e => 
-        Array.isArray(excludeExtensions) && 
-        excludeExtensions.some(ex => ex.toLowerCase() === e)
-      );
+      // If ANY of these extensions are in the excludeExtensions list, exclude the file
+      if (Array.isArray(excludeExtensions)) {
+        for (const excludeExt of excludeExtensions) {
+          if (typeof excludeExt === 'string' && htmlExtensions.includes(excludeExt.toLowerCase())) {
+            this.logger.info(`⛔ Excluded HTML/template file: ${fileName} (extension ${ext} in excludeExtensions)`);
+            return; // Skip this file
+          }
+        }
+      }
       
-      if (shouldExclude) {
-        this.logger.info(`⛔ Excluded HTML/template file: ${fileName} (extension ${ext} in excludeExtensions)`);
-        return; // Skip HTML files if they're in excludeExtensions
+      // Additional check for exact extension match
+      const exactMatch = Array.isArray(excludeExtensions) && 
+                         excludeExtensions.some(e => typeof e === 'string' && e.toLowerCase() === ext);
+      if (exactMatch) {
+        this.logger.info(`⛔ Excluded HTML/template file: ${fileName} (exact extension match in excludeExtensions)`);
+        return; // Skip this file too
       }
     }
 

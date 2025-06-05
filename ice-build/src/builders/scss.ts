@@ -413,6 +413,17 @@ export class SCSSBuilder extends EventEmitter implements Builder {
 
     if (!this.dependencyGraph.has(normalizedPartialPath)) {
       logger.warn(`Partial path ${path.basename(normalizedPartialPath)} not found in dependency graph.`);
+      
+      // Try to suggest similar paths for better error messages
+      const basename = path.basename(normalizedPartialPath);
+      const similarFiles = Array.from(this.dependencyGraph.keys())
+                            .filter(key => path.basename(key).includes(basename.replace(/^_/, '')))
+                            .map(key => path.basename(key));
+                            
+      if (similarFiles.length > 0) {
+        logger.info(`Similar files in graph: ${similarFiles.join(', ')}`);
+      }
+      
       return [];
     }
     
@@ -445,7 +456,8 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     
     // Regular traversal for other cases
     if (result.length === 0) {
-      const findAllParents = (currentPath: string) => {
+      // Enhanced implementation to handle @forward relationships
+      const findAllParents = (currentPath: string, depth: number = 0) => {
         if (processedFiles.has(currentPath)) return;
         processedFiles.add(currentPath);
         
@@ -456,21 +468,83 @@ export class SCSSBuilder extends EventEmitter implements Builder {
         if (!path.basename(currentPath).startsWith('_')) {
           result.push(currentPath);
           if (this.verboseLogging) {
-            logger.debug(`Found entry point: ${path.basename(currentPath)}`);
+            logger.debug(`Found entry point: ${path.basename(currentPath)} at depth ${depth}`);
           }
         }
         
-        // Continue traversal with all importers
+        // Check direct importers first
         for (const importer of currentNode.importers) {
-          findAllParents(importer);
+          findAllParents(importer, depth + 1);
+        }
+        
+        // Special handling for index files or modules using @forward
+        // For partials without direct importers, check if they might be forwarded
+        if (currentNode.importers.size === 0 && path.basename(currentPath).startsWith('_')) {
+          // Check all files in the dependency graph that might be forwarding this file
+          for (const [filePath, node] of this.dependencyGraph.entries()) {
+            // Skip self and non-partials
+            if (filePath === currentPath || !path.basename(filePath).startsWith('_')) continue;
+            
+            // If this is an index file and it's in the same directory or parent directory
+            const isIndexFile = path.basename(filePath).startsWith('_index.');
+            const isSameOrParentDir = 
+              path.dirname(filePath) === path.dirname(currentPath) || 
+              path.dirname(currentPath).startsWith(path.dirname(filePath));
+            
+            if (isIndexFile && isSameOrParentDir) {
+              // Check if any of these index files are imported by other files
+              if (node.importers.size > 0) {
+                if (this.verboseLogging) {
+                  logger.debug(`Found potential forwarding file: ${path.basename(filePath)}`);
+                }
+                
+                // Recursively check these importers
+                for (const forwardingImporter of node.importers) {
+                  findAllParents(forwardingImporter, depth + 1);
+                }
+              }
+              
+              // Also check patterns like components/_index.scss forwarding components/buttons/_index.scss
+              if (node.uses.size > 0 && node.uses.has(currentPath)) {
+                if (this.verboseLogging) {
+                  logger.debug(`${path.basename(filePath)} forwards ${path.basename(currentPath)}`);
+                }
+                
+                findAllParents(filePath, depth + 1);
+              }
+            }
+          }
         }
       };
       
       findAllParents(normalizedPartialPath);
     }
     
-    if (this.verboseLogging && result.length > 0) {
+    // Log more detailed information about the results
+    if (result.length > 0) {
       logger.info(`Found ${result.length} entry points for ${path.basename(normalizedPartialPath)}`);
+      
+      if (this.verboseLogging) {
+        // Log each result for easier debugging
+        result.forEach(entryPoint => {
+          logger.debug(`  → ${path.basename(entryPoint)} (${entryPoint})`);
+        });
+      }
+    } else {
+      logger.warn(`No parent files found that import ${path.basename(normalizedPartialPath)}`);
+      
+      // Additional diagnostic logs
+      if (this.verboseLogging) {
+        const node = this.dependencyGraph.get(normalizedPartialPath);
+        
+        // Check if this file is used by any other files
+        if (node && Array.from(this.dependencyGraph.entries()).some(([_, n]) => n.uses.has(normalizedPartialPath))) {
+          logger.debug(`Note: ${path.basename(normalizedPartialPath)} is used by other files but they might not be entry points`);
+        }
+        
+        // Try to trace and display dependency chain
+        this.traceFullDependencyPath(normalizedPartialPath);
+      }
     }
     
     return result;
