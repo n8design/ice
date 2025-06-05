@@ -97,9 +97,18 @@ export class OutputWatcher {
     }
 
     // Check if this file type should be excluded via config
-    if (this.config?.hotreload?.excludeExtensions?.includes(ext)) {
-      this.logger.info(`Skipping reload for ${fileName} (extension ${ext} found in excludeExtensions)`);
-      return; // Skip excluded extensions - exit early
+    const excludeExtensions = this.config?.hotreload?.excludeExtensions;
+    
+    if (excludeExtensions && Array.isArray(excludeExtensions)) {
+      // Case insensitive check for the extension
+      const isExcluded = excludeExtensions.some(excludedExt => 
+        excludedExt.toLowerCase() === ext.toLowerCase()
+      );
+      
+      if (isExcluded) {
+        this.logger.info(`Skipping reload for ${fileName} (extension ${ext} found in excludeExtensions)`);
+        return; // Skip excluded extensions - exit early
+      }
     }
 
     // Handle different file types

@@ -60,7 +60,8 @@ export default {
   hotreload: {
     enabled: true,
     port: 3001,
-    host: 'localhost'
+    host: 'localhost',
+    excludeExtensions: ['.map', '.d.ts', '.html', '.htm', '.hbs'] // Exclude these file extensions from triggering hot reload
   },
   
   // Static assets to copy from src to dist
