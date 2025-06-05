@@ -103,8 +103,8 @@ export class Builder extends EventEmitter {
         ? this.config.output 
         : (this.config.output && 'path' in this.config.output ? this.config.output.path : 'public');
         
-      // Create output watcher with both required arguments
-      this.outputWatcher = new OutputWatcher(outputDir, this.hotReloadServer);
+      // Create output watcher with all three arguments (including config)
+      this.outputWatcher = new OutputWatcher(outputDir, this.hotReloadServer, this.config);
       
       // Start the watcher
       this.outputWatcher.start();

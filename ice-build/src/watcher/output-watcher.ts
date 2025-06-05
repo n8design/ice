@@ -98,8 +98,8 @@ export class OutputWatcher {
 
     // Check if this file type should be excluded via config
     if (this.config?.hotreload?.excludeExtensions?.includes(ext)) {
-      this.logger.debug(`Skipping excluded file: ${fileName}`);
-      return; // Skip excluded extensions
+      this.logger.info(`Skipping reload for ${fileName} (extension ${ext} found in excludeExtensions)`);
+      return; // Skip excluded extensions - exit early
     }
 
     // Handle different file types
@@ -109,8 +109,9 @@ export class OutputWatcher {
     } else if (ext === '.js') {
       this.logger.info(`Detected JS change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('full', filePath);
-    } else if (ext === '.html' || ext === '.htm') {
-      this.logger.info(`Detected HTML change in output: ${fileName}`);
+    } else {
+      // For any other file type (including HTML if not in excludeExtensions)
+      this.logger.info(`Detected change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('full', filePath);
     }
   }
