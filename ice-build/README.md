@@ -246,7 +246,7 @@ You can control which output files trigger hot reload events using the `excludeE
 ```js
 hotreload: {
   port: 8080,
-  excludeExtensions: ['.map', '.d.ts'], // These file types will be ignored by the output watcher
+  excludeExtensions: ['.map', '.d.ts', '.html', '.htm'], // These file types will be ignored by the output watcher
 }
 ```
 
