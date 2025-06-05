@@ -50,6 +50,7 @@ export interface IceConfig {
     port?: number;
     host?: string;
     debounceTime?: number;
+    excludeExtensions?: string[];
   };
   esbuild?: BuildOptions;
   postcss?: {

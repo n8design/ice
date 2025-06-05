@@ -91,7 +91,8 @@ export function registerWatchCommand(program: Command): void {
             
             // Create and start the output watcher
             const { OutputWatcher } = await import('../../watcher/output-watcher.js');
-            const outputWatcher = new OutputWatcher(outputDir, hotReloadServer);
+            // Pass the entire config object to OutputWatcher
+            const outputWatcher = new OutputWatcher(outputDir, hotReloadServer, config);
             outputWatcher.start();
             
             logger.success('Hot reload server started');

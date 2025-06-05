@@ -104,11 +104,23 @@ export default {
   // Hot reloading options
   hotreload: {
     port: 8080, // WebSocket server port (default: 8080)
+    // excludeExtensions: ['.map', '.d.ts'], // File extensions to ignore when triggering hot reload
   },
   // CSS dependency graph export options
   graph: {
     // format: 'json', // Output format: 'json', 'dot', 'nx', or 'all'
     // outputPath: './graphs' // Custom output path for graph files
+  },
+  // Filter options for including/excluding files
+  filter: {
+    // include: ['**/*.scss', '**/*.ts'], // Glob patterns for files to include
+    // exclude: ['**/*.test.ts', '**/node_modules/**'], // Glob patterns for files to exclude
+    // transformers: [
+    //   {
+    //     test: /\.scss$/, // Regex to match files
+    //     use: (content, filepath) => { return transformedContent; } // Custom transformer function
+    //   }
+    // ]
   },
   // Copy static assets
   assets: {
@@ -223,4 +235,25 @@ npx ice-build export-graph --format all
 
 # Build and export graph in one step
 npx ice-build build --export-graph
-````
+```
+
+### Hot Reload Output Filtering
+
+You can control which output files trigger hot reload events using the `excludeExtensions` option in the `hotreload` config section. This is useful for ignoring changes to files like source maps or type definitions that do not require a browser reload.
+
+**Example:**
+
+```js
+hotreload: {
+  port: 8080,
+  excludeExtensions: ['.map', '.d.ts'], // These file types will be ignored by the output watcher
+}
+```
+
+**How it works:**
+- When a file changes in the output directory, the watcher checks its extension.
+- If the extension is listed in `excludeExtensions`, the file is ignored and does not trigger a reload.
+- If the file is a `.css` file, the browser will receive a CSS refresh (no full reload).
+- For all other file types, a full page reload is triggered in the browser.
+
+This filtering is handled by the OutputWatcher and helps prevent unnecessary reloads for files that do not affect the user experience.

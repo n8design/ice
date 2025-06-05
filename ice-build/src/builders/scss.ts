@@ -988,7 +988,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
           path.resolve(process.cwd(), 'node_modules')
         );
 
-        console.log('Sass loadPaths: After', includePaths);
+        // console.log('Sass loadPaths: After', includePaths);
 
         const result = sass.compile(absolutePath, {
           style: sassStyle,
