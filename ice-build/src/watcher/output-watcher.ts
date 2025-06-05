@@ -96,19 +96,31 @@ export class OutputWatcher {
       return;
     }
 
-    // Check if this file type should be excluded via config
-    const excludeExtensions = this.config?.hotreload?.excludeExtensions;
-    
-    if (excludeExtensions && Array.isArray(excludeExtensions)) {
-      // Case insensitive check for the extension
-      const isExcluded = excludeExtensions.some(excludedExt => 
-        excludedExt.toLowerCase() === ext.toLowerCase()
+    // Explicitly handle HTML, HTM, and HBS files in every case
+    // This ensures they're always excluded if listed in excludeExtensions
+    if (ext === '.html' || ext === '.htm' || ext === '.hbs') {
+      const excludeExtensions = this.config?.hotreload?.excludeExtensions || [];
+      
+      // Check if extension should be excluded
+      const extensionsToCheck = ['.html', '.htm', '.hbs'];
+      const shouldExclude = extensionsToCheck.some(e => 
+        Array.isArray(excludeExtensions) && 
+        excludeExtensions.some(ex => ex.toLowerCase() === e)
       );
       
-      if (isExcluded) {
-        this.logger.info(`Skipping reload for ${fileName} (extension ${ext} found in excludeExtensions)`);
-        return; // Skip excluded extensions - exit early
+      if (shouldExclude) {
+        this.logger.info(`⛔ Excluded HTML/template file: ${fileName} (extension ${ext} in excludeExtensions)`);
+        return; // Skip HTML files if they're in excludeExtensions
       }
+    }
+
+    // General check for excluded extensions
+    const excludeExtensions = this.config?.hotreload?.excludeExtensions || [];
+    if (Array.isArray(excludeExtensions) && excludeExtensions.some(e => 
+      typeof e === 'string' && e.toLowerCase() === ext.toLowerCase()
+    )) {
+      this.logger.info(`🛑 Skipping file: ${fileName} (extension ${ext} in excludeExtensions)`);
+      return;
     }
 
     // Handle different file types
@@ -119,7 +131,7 @@ export class OutputWatcher {
       this.logger.info(`Detected JS change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('full', filePath);
     } else {
-      // For any other file type (including HTML if not in excludeExtensions)
+      // For any other file type
       this.logger.info(`Detected change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('full', filePath);
     }
