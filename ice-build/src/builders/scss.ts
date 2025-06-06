@@ -476,44 +476,99 @@ export class SCSSBuilder extends EventEmitter implements Builder {
         for (const importer of currentNode.importers) {
           findAllParents(importer, depth + 1);
         }
+           // Enhanced handling for index files or modules using @forward
+      // For partials without direct importers, check if they might be forwarded
+      if (currentNode.importers.size === 0 && path.basename(currentPath).startsWith('_')) {
+        // First approach: Check for direct inclusion in any index files
+        for (const [filePath, node] of this.dependencyGraph.entries()) {
+          // Skip self and non-partials
+          if (filePath === currentPath || !path.basename(filePath).startsWith('_')) continue;
+          
+          // Check if this file is explicitly used by any index file
+          if (node.uses.has(currentPath)) {
+            if (this.verboseLogging) {
+              logger.debug(`${path.basename(filePath)} directly uses/forwards ${path.basename(currentPath)}`);
+            }
+            findAllParents(filePath, depth + 1);
+          }
+        }
         
-        // Special handling for index files or modules using @forward
-        // For partials without direct importers, check if they might be forwarded
-        if (currentNode.importers.size === 0 && path.basename(currentPath).startsWith('_')) {
-          // Check all files in the dependency graph that might be forwarding this file
-          for (const [filePath, node] of this.dependencyGraph.entries()) {
-            // Skip self and non-partials
-            if (filePath === currentPath || !path.basename(filePath).startsWith('_')) continue;
-            
-            // If this is an index file and it's in the same directory or parent directory
-            const isIndexFile = path.basename(filePath).startsWith('_index.');
-            const isSameOrParentDir = 
-              path.dirname(filePath) === path.dirname(currentPath) || 
-              path.dirname(currentPath).startsWith(path.dirname(filePath));
-            
-            if (isIndexFile && isSameOrParentDir) {
-              // Check if any of these index files are imported by other files
-              if (node.importers.size > 0) {
-                if (this.verboseLogging) {
-                  logger.debug(`Found potential forwarding file: ${path.basename(filePath)}`);
-                }
-                
-                // Recursively check these importers
-                for (const forwardingImporter of node.importers) {
-                  findAllParents(forwardingImporter, depth + 1);
-                }
-              }
-              
-              // Also check patterns like components/_index.scss forwarding components/buttons/_index.scss
-              if (node.uses.size > 0 && node.uses.has(currentPath)) {
-                if (this.verboseLogging) {
-                  logger.debug(`${path.basename(filePath)} forwards ${path.basename(currentPath)}`);
-                }
-                
-                findAllParents(filePath, depth + 1);
+        // Second approach: More aggressively check for index files that might be forwarding this
+        for (const [filePath, node] of this.dependencyGraph.entries()) {
+          // Skip self
+          if (filePath === currentPath) continue;
+          
+          // Focus specifically on index files
+          const isIndexFile = path.basename(filePath).startsWith('_index.');
+          if (!isIndexFile) continue;
+          
+          // Get directory relationships
+          const fileDir = path.dirname(filePath);
+          const currentDir = path.dirname(currentPath);
+          
+          // ENHANCED: More permissive directory relationships, exploring every possibility
+          const directRelationship = fileDir === currentDir; // Same directory
+          const parentChildRelationship = currentDir.startsWith(fileDir) || fileDir.startsWith(currentDir); // Parent-child relationship
+          
+          // ENHANCED: Check even files in sibling directories - mat-mgmt might have a reference related to another sibling dir
+          const commonParent = currentDir.split('/').slice(0, -1).join('/') === fileDir.split('/').slice(0, -1).join('/');
+          
+          // ENHANCED: For more specific patterns like organisms/mat-mgmt/_index.scss
+          const isDeepStructure = currentDir.includes('/03-organisms/') || 
+                                  currentDir.includes('/organisms/') || 
+                                  fileDir.includes('/03-organisms/') ||
+                                  fileDir.includes('/organisms/');
+                                  
+          // EXPANDED: Check more aggressively for potential relationships
+          if (isIndexFile && (directRelationship || parentChildRelationship || commonParent || isDeepStructure)) {
+            if (this.verboseLogging) {
+              if (directRelationship) {
+                logger.debug(`Found index file ${path.basename(filePath)} in the same directory`);
+              } else if (parentChildRelationship) {
+                logger.debug(`Found index file ${path.basename(filePath)} in parent/child relationship with ${path.basename(currentPath)}`);
+              } else if (commonParent) {
+                logger.debug(`Found index file ${path.basename(filePath)} in sibling directory to ${path.basename(currentPath)}`);
+              } else if (isDeepStructure) {
+                logger.debug(`Found index file ${path.basename(filePath)} in organisms structure - special handling`);
               }
             }
+            
+            // Check if any of these index files are imported by other files
+            if (node.importers.size > 0) {
+              for (const forwardingImporter of node.importers) {
+                findAllParents(forwardingImporter, depth + 1);
+              }
+            } else {
+              // Even if this index isn't imported directly, recursively check it
+              findAllParents(filePath, depth + 1);
+            }
           }
+        }
+        
+        // Third approach: Extra check for organisms/mat-mgmt pattern specifically
+        if (path.basename(currentPath) !== '_index.scss') { // Skip index files to prevent loops
+          for (const [filePath, node] of this.dependencyGraph.entries()) {
+            if (filePath === currentPath) continue;
+            
+            const isIndexFile = path.basename(filePath).startsWith('_index.');
+            if (!isIndexFile) continue;
+            
+            const fileBaseName = path.basename(filePath, '.scss').replace(/^_/, '');
+            const currentBaseName = path.basename(currentPath, '.scss').replace(/^_/, '');
+            
+            // Check if we're in mat-mgmt or similar patterns with matching index files
+            if (fileBaseName === 'index' && 
+               (currentPath.includes('/mat-mgmt/') || 
+                currentPath.includes('/organisms/') || 
+                currentPath.includes('/components/'))) {
+                
+              if (this.verboseLogging) {
+                logger.debug(`Special check for ${currentBaseName} in potential forwarding structure: ${filePath}`);
+              }
+              findAllParents(filePath, depth + 1);
+            }
+          }
+        }
         }
       };
       
@@ -537,9 +592,50 @@ export class SCSSBuilder extends EventEmitter implements Builder {
       if (this.verboseLogging) {
         const node = this.dependencyGraph.get(normalizedPartialPath);
         
-        // Check if this file is used by any other files
-        if (node && Array.from(this.dependencyGraph.entries()).some(([_, n]) => n.uses.has(normalizedPartialPath))) {
-          logger.debug(`Note: ${path.basename(normalizedPartialPath)} is used by other files but they might not be entry points`);
+        // Check all potential usages
+        const directUsers = [];
+        
+        for (const [filePath, n] of this.dependencyGraph.entries()) {
+          if (n.uses.has(normalizedPartialPath)) {
+            directUsers.push(filePath);
+          }
+        }
+        
+        if (directUsers.length > 0) {
+          logger.debug(`Files directly using ${path.basename(normalizedPartialPath)}:`);
+          directUsers.forEach(user => logger.debug(`  → ${path.basename(user)} (${user})`));
+        } else {
+          logger.debug(`No files directly use ${path.basename(normalizedPartialPath)}`);
+        }
+        
+        // Check if this is likely being used via an index file
+        const dirName = path.dirname(normalizedPartialPath);
+        const indexInSameDir = this.dependencyGraph.has(
+          this.normalizePath(path.join(dirName, '_index.scss'))
+        );
+        
+        if (indexInSameDir) {
+          logger.debug(`Note: Found _index.scss in same directory - check forwarding`);
+        }
+        
+        // Look for any index files in parent directories
+        let currentDir = path.dirname(normalizedPartialPath);
+        const rootDir = process.cwd();
+        let parentIndexFound = false;
+        
+        while (currentDir !== rootDir && currentDir !== path.dirname(currentDir)) {
+          const potentialIndexPath = this.normalizePath(path.join(currentDir, '_index.scss'));
+          
+          if (this.dependencyGraph.has(potentialIndexPath)) {
+            logger.debug(`Found potential parent index file: ${potentialIndexPath}`);
+            parentIndexFound = true;
+          }
+          
+          currentDir = path.dirname(currentDir);
+        }
+        
+        if (!parentIndexFound && !indexInSameDir) {
+          logger.debug(`No _index.scss files found in parent directories`);
         }
         
         // Try to trace and display dependency chain
@@ -550,10 +646,6 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     return result;
   }
   
-  /**
-   * Trace and print the full dependency path from a file to all entry points
-   * @param filePath Path to the file to trace
-   */
   private traceFullDependencyPath(filePath: string): void {
     logger.info(`=== TRACING DEPENDENCY PATH FOR: ${path.basename(filePath)} ===`);
     
@@ -596,7 +688,73 @@ export class SCSSBuilder extends EventEmitter implements Builder {
       }
     }
     
-    // Step 2: Find all entry points that depend on this file
+    // Step 2: Check for index files that might forward this file
+    logger.info(`Checking for index files that might forward ${path.basename(filePath)}:`);
+    
+    // Check if this file is directly used by any index file
+    let foundForwarding = false;
+    for (const [indexPath, indexNode] of this.dependencyGraph.entries()) {
+      if (path.basename(indexPath).startsWith('_index.') && indexNode.uses.has(normalizedPath)) {
+        foundForwarding = true;
+        logger.info(`  → ${path.basename(indexPath)} (${indexPath}) directly forwards this file`);
+        
+        // Check what imports this index file
+        if (indexNode.importers.size > 0) {
+          logger.info(`    Importers of ${path.basename(indexPath)}:`);
+          for (const indexImporter of indexNode.importers) {
+            logger.info(`      → ${path.basename(indexImporter)} (${indexImporter})`);
+          }
+        } else {
+          logger.info(`    No direct importers of ${path.basename(indexPath)}`);
+          
+          // Recursively check if this index might be forwarded by other indexes
+          this.traceIndexForwarding(indexPath, '      ');
+        }
+      }
+    }
+    
+    // Check if this file is in the same directory as an index file
+    const fileDir = path.dirname(normalizedPath);
+    const indexInSameDir = Array.from(this.dependencyGraph.keys())
+      .filter(key => path.basename(key).startsWith('_index.') && 
+              path.dirname(key) === fileDir);
+              
+    if (indexInSameDir.length > 0 && !foundForwarding) {
+      logger.info(`  Found ${indexInSameDir.length} index files in the same directory:`);
+      for (const potentialIndex of indexInSameDir) {
+        logger.info(`    → ${path.basename(potentialIndex)} (${potentialIndex})`);
+      }
+    }
+    
+    // Check parent directories for index files
+    let currentDir = path.dirname(normalizedPath);
+    const rootDir = process.cwd();
+    
+    while (currentDir !== rootDir && currentDir !== path.dirname(currentDir)) {
+      const parentIndexFiles = Array.from(this.dependencyGraph.keys())
+        .filter(key => path.basename(key).startsWith('_index.') && 
+                path.dirname(key) === currentDir);
+                
+      if (parentIndexFiles.length > 0) {
+        logger.info(`  Found ${parentIndexFiles.length} index files in parent directory ${currentDir}:`);
+        for (const parentIndex of parentIndexFiles) {
+          logger.info(`    → ${path.basename(parentIndex)} (${parentIndex})`);
+          
+          // Check what imports this parent index file
+          const parentIndexNode = this.dependencyGraph.get(parentIndex);
+          if (parentIndexNode && parentIndexNode.importers.size > 0) {
+            logger.info(`      Importers of ${path.basename(parentIndex)}:`);
+            for (const parentIndexImporter of parentIndexNode.importers) {
+              logger.info(`        → ${path.basename(parentIndexImporter)} (${parentIndexImporter})`);
+            }
+          }
+        }
+      }
+      
+      currentDir = path.dirname(currentDir);
+    }
+    
+    // Step 3: Find all entry points that depend on this file
     const entryPoints = new Set<string>();
     const visited = new Map<string, string[]>(); // Track paths to avoid cycles
     
@@ -629,7 +787,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     // Start traversal from this file
     findPathsToEntryPoints(normalizedPath);
     
-    // Step 3: Print all paths to entry points
+    // Step 4: Print all paths to entry points
     if (entryPoints.size === 0) {
       logger.warn(`No entry points found that depend on this file`);
       logger.info(`This means changes to this file won't trigger any main file rebuilds`);
@@ -883,7 +1041,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     // Try searching in source directories from config
     if (Array.isArray(this.config.input?.scss)) {
       for (const pattern of this.config.input.scss) {
-        const baseDir = pattern.replace(/\/\*\*\/\*\.[^.]+$|\*\*\/\*\.[^.]+$|\*\.[^.]+$/g, '');
+        const baseDir = pattern.replace(/\/\*\*\/\*\.scss|\*\*\/\*\.scss|\*\.scss/g, '');
         
         for (const filePattern of potentialFileNames) {
           const fullPath = path.resolve(baseDir, filePattern);
@@ -1169,5 +1327,82 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     }
     
     return paths;
+  }
+
+  /**
+   * Explicitly check if an index file forwards a specific module
+   * This adds an extra layer of detection by checking the actual content
+   * @param indexPath Path to index file
+   * @param modulePath Path to check if forwarded
+   */
+  private async checkExplicitForwards(indexPath: string, modulePath: string): Promise<boolean> {
+    try {
+      // Normalize paths for comparison
+      const normalizedIndex = this.normalizePath(indexPath);
+      const normalizedModule = this.normalizePath(modulePath);
+      
+      // Skip if either path doesn't exist
+      if (!this.dependencyGraph.has(normalizedIndex) || !this.dependencyGraph.has(normalizedModule)) {
+        return false;
+      }
+      
+      // Skip if the index doesn't use the module (optimization)
+      const indexNode = this.dependencyGraph.get(normalizedIndex);
+      if (!indexNode || !indexNode.uses.has(normalizedModule)) {
+        return false;
+      }
+      
+      // If it's not an index file, skip
+      if (!path.basename(indexPath).startsWith('_index.')) {
+        return false;
+      }
+      
+      // Read the content of the index file
+      if (!fs.existsSync(indexPath)) {
+        return false;
+      }
+      
+      const content = await fsPromises.readFile(indexPath, 'utf-8');
+      
+      // Get the module name without extension and underscore prefix
+      const moduleName = path.basename(modulePath).replace(/^_/, '').replace(/\.(scss|sass)$/, '');
+      
+      // Check for @forward directive with this module
+      const forwardRegex = new RegExp(`@forward\\s+(['"])([^'"]*\\/)?${moduleName}\\1`, 'gm');
+      const match = forwardRegex.test(content);
+      
+      if (match && this.verboseLogging) {
+        logger.debug(`Found explicit @forward for ${moduleName} in ${path.basename(indexPath)}`);
+      }
+      
+      return match;
+    } catch (error) {
+      logger.error(`Error checking forwards in ${indexPath}: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  }
+  
+  private traceIndexForwarding(indexPath: string, indent: string = ''): void {
+    // Check if this index file is used/forwarded by other index files
+    for (const [otherPath, otherNode] of this.dependencyGraph.entries()) {
+      if (otherPath !== indexPath && path.basename(otherPath).startsWith('_index.') && 
+          otherNode.uses.has(indexPath)) {
+        logger.info(`${indent}→ ${path.basename(otherPath)} (${otherPath}) forwards this index`);
+        
+        // If this other index has importers, log them
+        if (otherNode.importers.size > 0) {
+          logger.info(`${indent}  Importers of ${path.basename(otherPath)}:`);
+          for (const otherImporter of otherNode.importers) {
+            logger.info(`${indent}    → ${path.basename(otherImporter)} (${otherImporter})`);
+          }
+        } else {
+          logger.info(`${indent}  No direct importers of ${path.basename(otherPath)}`);
+          // Recursively check further forwarding (with recursion limit)
+          if (indent.length < 20) { // Prevent infinite recursion
+            this.traceIndexForwarding(otherPath, `${indent}  `);
+          }
+        }
+      }
+    }
   }
 }

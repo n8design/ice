@@ -59,7 +59,7 @@ export default {
   // Hot reloading configuration for development
   hotreload: {
     enabled: true,
-    port: 3001,
+    port: 3002,
     host: 'localhost',
     excludeExtensions: ['.map', '.d.ts', '.html', '.htm', '.hbs'] // Exclude these file extensions from triggering hot reload
   },
