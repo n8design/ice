@@ -186,8 +186,8 @@ export class OutputWatcher {
         this.logger.debug(`🛑 FINAL SAFETY: Blocking HTML file from triggering reload: ${fileName}`);
         return;
       } else {
-        // Log a warning that an HTML file is being processed despite potential configuration
-        this.logger.warn(`⚠️ HTML file not excluded by config - check your configuration: ${fileName}`);
+        // Only log configuration warning in verbose/debug mode to avoid spam
+        this.logger.debug(`⚠️ HTML file not excluded by config - check your configuration: ${fileName}`);
       }
     }
     
