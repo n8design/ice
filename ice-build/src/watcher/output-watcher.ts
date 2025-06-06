@@ -102,32 +102,30 @@ export class OutputWatcher {
     if (htmlExtensions.includes(ext)) {
       const excludeExtensions = this.config?.hotreload?.excludeExtensions || [];
       
-      // If ANY of these extensions are in the excludeExtensions list, exclude the file
+      // Check if the current file extension is in the excludeExtensions list
       if (Array.isArray(excludeExtensions)) {
-        for (const excludeExt of excludeExtensions) {
-          if (typeof excludeExt === 'string' && htmlExtensions.includes(excludeExt.toLowerCase())) {
-            this.logger.info(`⛔ Excluded HTML/template file: ${fileName} (extension ${ext} in excludeExtensions)`);
-            return; // Skip this file
-          }
+        const matchingExclude = excludeExtensions.find(
+          e => typeof e === 'string' && e.toLowerCase() === ext.toLowerCase()
+        );
+        
+        if (matchingExclude) {
+          this.logger.debug(`⛔ Excluded HTML/template file: ${fileName} (extension ${ext} in excludeExtensions)`);
+          return; // Skip this file
         }
-      }
-      
-      // Additional check for exact extension match
-      const exactMatch = Array.isArray(excludeExtensions) && 
-                         excludeExtensions.some(e => typeof e === 'string' && e.toLowerCase() === ext);
-      if (exactMatch) {
-        this.logger.info(`⛔ Excluded HTML/template file: ${fileName} (exact extension match in excludeExtensions)`);
-        return; // Skip this file too
       }
     }
 
     // General check for excluded extensions
     const excludeExtensions = this.config?.hotreload?.excludeExtensions || [];
-    if (Array.isArray(excludeExtensions) && excludeExtensions.some(e => 
-      typeof e === 'string' && e.toLowerCase() === ext.toLowerCase()
-    )) {
-      this.logger.info(`🛑 Skipping file: ${fileName} (extension ${ext} in excludeExtensions)`);
-      return;
+    if (Array.isArray(excludeExtensions)) {
+      const matchingExclude = excludeExtensions.find(
+        e => typeof e === 'string' && e.toLowerCase() === ext.toLowerCase()
+      );
+      
+      if (matchingExclude) {
+        this.logger.debug(`🛑 Skipping file: ${fileName} (extension ${ext} in excludeExtensions)`);
+        return;
+      }
     }
 
     // Handle different file types
