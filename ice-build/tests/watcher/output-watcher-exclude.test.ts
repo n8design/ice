@@ -85,7 +85,7 @@ describe('OutputWatcher Exclude Extensions', () => {
     // Should not notify clients for excluded extensions
     expect(mockHotReloadServer.notifyClients).not.toHaveBeenCalled();
     // Should log that it's excluding the file using debug level
-    expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('Excluded HTML/template file'));
+    expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('Excluded by hotreload.excludeExtensions'));
   });
 
   it('should exclude HBS files from triggering reloads', () => {

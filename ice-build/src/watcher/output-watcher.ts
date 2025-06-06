@@ -49,12 +49,22 @@ export class OutputWatcher {
 
     this.logger.info(`Starting to watch output directory: ${this.outputDir}`);
 
-    // Initialize the watcher
+    // Initialize the watcher with configuration-aware ignored patterns
+    const defaultIgnored = [
+      '**/.*', // Ignore dot files using a glob pattern string
+      '**/node_modules/**' // Ignore node_modules
+    ];
+    
+    // Merge configuration-provided ignore patterns with defaults
+    const configIgnored = this.config?.watch?.ignored || [];
+    const ignoredPatterns = Array.isArray(configIgnored) 
+      ? [...defaultIgnored, ...configIgnored] 
+      : defaultIgnored;
+    
+    this.logger.debug(`Ignoring file patterns: ${ignoredPatterns.join(', ')}`);
+    
     this.watcher = chokidar.watch(this.outputDir, {
-      ignored: [
-        '**/.*', // Ignore dot files using a glob pattern string
-        '**/node_modules/**' // Ignore node_modules
-      ],
+      ignored: ignoredPatterns,
       persistent: true,
       ignoreInitial: true, // Don't emit events for initial scan
       awaitWriteFinish: {
@@ -90,44 +100,55 @@ export class OutputWatcher {
   private handleFileChange(filePath: string): void {
     const ext = path.extname(filePath).toLowerCase();
     const fileName = path.basename(filePath);
+    const relativePath = path.relative(this.outputDir, filePath);
 
     // Skip partials and temp files
     if (fileName.startsWith('_') || fileName.startsWith('.')) {
+      this.logger.debug(`⏭️ Skipping partial/temp file: ${fileName}`);
       return;
     }
-
-    // Special handling for HTML, HTM, and HBS files
-    // Always check these first to prevent reload of these file types
-    const htmlExtensions = ['.html', '.htm', '.hbs'];
-    if (htmlExtensions.includes(ext)) {
-      const excludeExtensions = this.config?.hotreload?.excludeExtensions || [];
-      
-      // Check if the current file extension is in the excludeExtensions list
-      if (Array.isArray(excludeExtensions)) {
-        const matchingExclude = excludeExtensions.find(
-          e => typeof e === 'string' && e.toLowerCase() === ext.toLowerCase()
-        );
-        
-        if (matchingExclude) {
-          this.logger.debug(`⛔ Excluded HTML/template file: ${fileName} (extension ${ext} in excludeExtensions)`);
-          return; // Skip this file
+    
+    // Check for 'excludePaths' in configuration (custom, non-standard)
+    // This is for backward compatibility with older configs
+    const excludePaths = this.config?.watch?.excludePaths || [];
+    if (Array.isArray(excludePaths) && excludePaths.length > 0) {
+      for (const pattern of excludePaths) {
+        if (typeof pattern === 'string' && this.matchGlobPattern(pattern, relativePath, fileName)) {
+          this.logger.debug(`⛔ Skipping file matching watch.excludePaths pattern ${pattern}: ${fileName}`);
+          return;
+        }
+      }
+    }
+    
+    // Check if file matches any watch.ignored pattern
+    // Even though chokidar should handle this, we do a double-check
+    const watchIgnored = this.config?.watch?.ignored || [];
+    if (Array.isArray(watchIgnored) && watchIgnored.length > 0) {
+      for (const pattern of watchIgnored) {
+        if (typeof pattern === 'string' && this.matchGlobPattern(pattern, relativePath, fileName)) {
+          this.logger.debug(`⛔ Skipping file matching watch.ignored pattern ${pattern}: ${fileName}`);
+          return;
         }
       }
     }
 
-    // General check for excluded extensions
+    // Check for excluded extensions from hotreload configuration
     const excludeExtensions = this.config?.hotreload?.excludeExtensions || [];
-    if (Array.isArray(excludeExtensions)) {
+    if (Array.isArray(excludeExtensions) && excludeExtensions.length > 0) {
+      // Check if current file extension is in the excludeExtensions list
       const matchingExclude = excludeExtensions.find(
         e => typeof e === 'string' && e.toLowerCase() === ext.toLowerCase()
       );
       
       if (matchingExclude) {
-        this.logger.debug(`🛑 Skipping file: ${fileName} (extension ${ext} in excludeExtensions)`);
+        this.logger.debug(`🛑 Excluded by hotreload.excludeExtensions: ${fileName} (extension ${ext})`);
         return;
       }
     }
 
+    // At this point, we've passed all the exclusion checks,
+    // so the file should trigger a hot reload
+    
     // Handle different file types
     if (ext === '.css') {
       this.logger.info(`Detected CSS change in output: ${fileName}`);
@@ -135,10 +156,43 @@ export class OutputWatcher {
     } else if (ext === '.js') {
       this.logger.info(`Detected JS change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('full', filePath);
+    } else if (['.html', '.htm', '.hbs'].includes(ext)) {
+      // HTML files already passed exclusion checks, but log with specific message
+      this.logger.info(`Detected HTML change in output: ${fileName}`);
+      this.hotReloadServer.notifyClients('full', filePath);
     } else {
       // For any other file type
       this.logger.info(`Detected change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('full', filePath);
     }
+  }
+
+  /**
+   * Helper method to match a glob pattern against a file path or name
+   * @param globPattern The glob pattern to match against
+   * @param filePath The file path to check
+   * @param fileName Optional file name to check separately
+   * @returns True if the file matches the pattern
+   */
+  private matchGlobPattern(globPattern: string, filePath: string, fileName?: string): boolean {
+    // Convert glob pattern to a simple regex
+    // This is a very basic implementation that handles common glob patterns
+    const regexPattern = globPattern
+      .replace(/\./g, '\\.')    // Escape dots
+      .replace(/\*\*/g, '.*')   // ** becomes .*
+      .replace(/\*/g, '[^/]*'); // * becomes [^/]*
+    
+    const regex = new RegExp(`^${regexPattern}$`);
+    
+    // Check if either the path or filename match
+    if (regex.test(filePath)) {
+      return true;
+    }
+    
+    if (fileName && regex.test(fileName)) {
+      return true;
+    }
+    
+    return false;
   }
 }

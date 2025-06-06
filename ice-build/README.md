@@ -101,10 +101,17 @@ export default {
     // format: 'esm', // esbuild format (default: 'esm')
     // sourceMap: true, // Enable/disable source maps (default: true for dev, false for prod)
   },
+  // Watch mode configuration
+  watch: {
+    // File patterns to ignore when watching for changes (combines with default ignored patterns)
+    ignored: ['**/dist/**', '**/coverage/**'],
+    // Alternative way to specify excluded paths (for backward compatibility)
+    // excludePaths: ['**/temp/**', '**/logs/**'],
+  },
   // Hot reloading options
   hotreload: {
     port: 8080, // WebSocket server port (default: 8080)
-    // excludeExtensions: ['.map', '.d.ts'], // File extensions to ignore when triggering hot reload
+    excludeExtensions: ['.map', '.d.ts'], // File extensions to ignore when triggering hot reload
   },
   // CSS dependency graph export options
   graph: {
@@ -237,23 +244,51 @@ npx ice-build export-graph --format all
 npx ice-build build --export-graph
 ```
 
+## File Watching and Hot Reload Configuration
+
+### Watch Mode File Exclusions
+
+Ice Build's watch mode can be customized to ignore specific files or directories. This is handled through the following configuration options:
+
+#### Using `watch.ignored` (Recommended)
+
+This option specifies glob patterns for files and directories that should be ignored by the file watcher:
+
+```js
+watch: {
+  // Files and directories matching these patterns will be ignored by the watcher
+  ignored: [
+    '**/dist/**',          // Ignore all files in dist directories
+    '**/coverage/**',      // Ignore test coverage files
+    '**/*.test.{js,ts}',   // Ignore test files
+    '**/*.min.{js,css}'    // Ignore minified files
+  ]
+}
+```
+
+By default, the watcher already ignores the following patterns:
+- `**/.*` (dot files and directories)
+- `**/node_modules/**` (node modules directory)
+
+Your custom patterns will be combined with these defaults.
+
+#### Using `watch.excludePaths` (Legacy Support)
+
+For backward compatibility, you can also use the `excludePaths` option:
+
+```js
+watch: {
+  excludePaths: ['**/temp/**', '**/logs/**']
+}
+```
+
+This works the same way as `watch.ignored` but is maintained for compatibility with older configurations.
+
 ### Hot Reload Output Filtering
 
-You can control which output files trigger hot reload events using the `excludeExtensions` option in the `hotreload` config section. This is useful for ignoring changes to files like source maps or type definitions that do not require a browser reload.
-
-**Example:**
+You can control which output files trigger hot reload events using the `excludeExtensions` option in the `hotreload` config section:
 
 ```js
 hotreload: {
   port: 8080,
-  excludeExtensions: ['.map', '.d.ts', '.html', '.htm'], // These file types will be ignored by the output watcher
-}
-```
-
-**How it works:**
-- When a file changes in the output directory, the watcher checks its extension.
-- If the extension is listed in `excludeExtensions`, the file is ignored and does not trigger a reload.
-- If the file is a `.css` file, the browser will receive a CSS refresh (no full reload).
-- For all other file types, a full page reload is triggered in the browser.
-
-This filtering is handled by the OutputWatcher and helps prevent unnecessary reloads for files that do not affect the user experience.
+  excludeExtensions: ['.map', '.d
