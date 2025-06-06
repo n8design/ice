@@ -108,6 +108,15 @@ export class OutputWatcher {
       return;
     }
     
+    // Direct extension checks first (most efficient)
+    // Check if this type of file is explicitly excluded by extension
+    if (['.html', '.htm', '.hbs'].includes(ext) && 
+        Array.isArray(this.config?.hotreload?.excludeExtensions) &&
+        this.config.hotreload.excludeExtensions.includes(ext)) {
+      this.logger.debug(`⏭️ Direct extension match: skipping ${ext} file: ${fileName}`);
+      return;
+    }
+    
     // Check for 'excludePaths' in configuration (custom, non-standard)
     // This is for backward compatibility with older configs
     const excludePaths = this.config?.watch?.excludePaths || [];
@@ -145,6 +154,15 @@ export class OutputWatcher {
         return;
       }
     }
+    
+    // Additional special handling for HTML, HBS files if they're explicitly disabled
+    if (['.html', '.htm', '.hbs'].includes(ext)) {
+      // If html is disabled in config, skip HTML-type files
+      if (this.config?.html?.disabled === true) {
+        this.logger.debug(`🛑 Skipping HTML file (html.disabled=true): ${fileName}`);
+        return;
+      }
+    }
 
     // At this point, we've passed all the exclusion checks,
     // so the file should trigger a hot reload
@@ -157,7 +175,6 @@ export class OutputWatcher {
       this.logger.info(`Detected JS change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('full', filePath);
     } else if (['.html', '.htm', '.hbs'].includes(ext)) {
-      // HTML files already passed exclusion checks, but log with specific message
       this.logger.info(`Detected HTML change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('full', filePath);
     } else {
@@ -175,12 +192,45 @@ export class OutputWatcher {
    * @returns True if the file matches the pattern
    */
   private matchGlobPattern(globPattern: string, filePath: string, fileName?: string): boolean {
+    // Normalize patterns like "**/*.html" to match files in any directory
+    if (globPattern.startsWith('**/')) {
+      // If we're matching a pattern like "**/*.html", check if the file ends with the extension
+      const extensionMatch = globPattern.match(/\*\*\/\*(\.\w+)$/);
+      if (extensionMatch && extensionMatch[1]) {
+        const extensionToMatch = extensionMatch[1];
+        if (filePath.endsWith(extensionToMatch) || (fileName && fileName.endsWith(extensionToMatch))) {
+          return true;
+        }
+      }
+    }
+    
+    // Handle extension-only patterns like ".html", ".hbs"
+    if (globPattern.startsWith('.') && !globPattern.includes('/') && !globPattern.includes('*')) {
+      if (filePath.endsWith(globPattern) || (fileName && fileName.endsWith(globPattern))) {
+        return true;
+      }
+    }
+    
+    // For patterns like "source/**/*.html" or "public/**/*.html", extract just the extension
+    const fullPathExtensionMatch = globPattern.match(/\*\*\/\*(\.\w+)$/);
+    if (fullPathExtensionMatch && fullPathExtensionMatch[1]) {
+      const extensionToMatch = fullPathExtensionMatch[1];
+      if (filePath.endsWith(extensionToMatch) || (fileName && fileName.endsWith(extensionToMatch))) {
+        return true;
+      }
+    }
+    
+    // Standard glob pattern matching (fallback for other patterns)
     // Convert glob pattern to a simple regex
-    // This is a very basic implementation that handles common glob patterns
-    const regexPattern = globPattern
+    let regexPattern = globPattern
       .replace(/\./g, '\\.')    // Escape dots
       .replace(/\*\*/g, '.*')   // ** becomes .*
       .replace(/\*/g, '[^/]*'); // * becomes [^/]*
+    
+    // If the pattern doesn't start with a slash or drive letter, make it match anywhere in the path
+    if (!regexPattern.startsWith('/') && !regexPattern.match(/^[a-zA-Z]:\\/)) {
+      regexPattern = `.*${regexPattern}`;
+    }
     
     const regex = new RegExp(`^${regexPattern}$`);
     
