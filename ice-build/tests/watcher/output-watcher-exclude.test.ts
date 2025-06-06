@@ -85,9 +85,9 @@ describe('OutputWatcher Exclude Extensions', () => {
     // Should not notify clients for excluded extensions
     expect(mockHotReloadServer.notifyClients).not.toHaveBeenCalled();
     // Should log that it's excluding the file using debug level
-    // Check for either direct extension matching or the original message
+    // Check for direct extension matching message
     expect(mockLogger.debug).toHaveBeenCalledWith(
-      expect.stringMatching(/(Direct extension match|Excluded by hotreload.excludeExtensions)/)
+      expect.stringMatching(/Direct extension match: skipping \.html file:/)
     );
   });
 

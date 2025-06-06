@@ -102,6 +102,8 @@ export class OutputWatcher {
     const fileName = path.basename(filePath);
     const relativePath = path.relative(this.outputDir, filePath);
 
+    this.logger.debug(`🔍 Processing file change: ${fileName} (${ext})`);
+    
     // Skip partials and temp files
     if (fileName.startsWith('_') || fileName.startsWith('.')) {
       this.logger.debug(`⏭️ Skipping partial/temp file: ${fileName}`);
@@ -110,11 +112,25 @@ export class OutputWatcher {
     
     // Direct extension checks first (most efficient)
     // Check if this type of file is explicitly excluded by extension
-    if (['.html', '.htm', '.hbs'].includes(ext) && 
-        Array.isArray(this.config?.hotreload?.excludeExtensions) &&
-        this.config.hotreload.excludeExtensions.includes(ext)) {
-      this.logger.debug(`⏭️ Direct extension match: skipping ${ext} file: ${fileName}`);
-      return;
+    if (['.html', '.htm', '.hbs'].includes(ext)) {
+      // First check if HTML is disabled in config
+      if (this.config?.html?.disabled === true) {
+        this.logger.debug(`🛑 Skipping HTML file (html.disabled=true): ${fileName}`);
+        return;
+      }
+      
+      // Then check if these extensions are explicitly excluded
+      if (Array.isArray(this.config?.hotreload?.excludeExtensions)) {
+        // Check case-insensitive extension matching
+        const extensionsLowerCase = this.config.hotreload.excludeExtensions.map((e: any) => 
+          typeof e === 'string' ? e.toLowerCase() : e
+        );
+        
+        if (extensionsLowerCase.includes(ext.toLowerCase())) {
+          this.logger.debug(`⏭️ Direct extension match: skipping ${ext} file: ${fileName}`);
+          return;
+        }
+      }
     }
     
     // Check for 'excludePaths' in configuration (custom, non-standard)
@@ -144,22 +160,15 @@ export class OutputWatcher {
     // Check for excluded extensions from hotreload configuration
     const excludeExtensions = this.config?.hotreload?.excludeExtensions || [];
     if (Array.isArray(excludeExtensions) && excludeExtensions.length > 0) {
-      // Check if current file extension is in the excludeExtensions list
-      const matchingExclude = excludeExtensions.find(
-        e => typeof e === 'string' && e.toLowerCase() === ext.toLowerCase()
-      );
+      // Normalize extensions to lowercase for comparison
+      const extLowerCase = ext.toLowerCase();
+      const excludeExtensionsLower = excludeExtensions
+        .filter(e => typeof e === 'string')
+        .map(e => e.toLowerCase());
       
-      if (matchingExclude) {
+      // Check if current file extension is in the excludeExtensions list
+      if (excludeExtensionsLower.includes(extLowerCase)) {
         this.logger.debug(`🛑 Excluded by hotreload.excludeExtensions: ${fileName} (extension ${ext})`);
-        return;
-      }
-    }
-    
-    // Additional special handling for HTML, HBS files if they're explicitly disabled
-    if (['.html', '.htm', '.hbs'].includes(ext)) {
-      // If html is disabled in config, skip HTML-type files
-      if (this.config?.html?.disabled === true) {
-        this.logger.debug(`🛑 Skipping HTML file (html.disabled=true): ${fileName}`);
         return;
       }
     }
@@ -192,30 +201,64 @@ export class OutputWatcher {
    * @returns True if the file matches the pattern
    */
   private matchGlobPattern(globPattern: string, filePath: string, fileName?: string): boolean {
+    // Normalize paths for comparison
+    const normalizedFilePath = filePath.toLowerCase();
+    const normalizedPattern = globPattern.toLowerCase();
+    
+    // Special handling for HTML and HBS files when matching patterns
+    const htmlExtensions = ['.html', '.htm', '.hbs'];
+    const fileExt = path.extname(filePath).toLowerCase();
+    
+    // Common HTML pattern matching
+    if (htmlExtensions.includes(fileExt)) {
+      // Match extension-only patterns (e.g. ".html" matches any HTML file)
+      if (htmlExtensions.includes(normalizedPattern)) {
+        return true;
+      }
+      
+      // Match common HTML glob patterns
+      const commonHtmlPatterns = ['**/*.html', '**/*.htm', '**/*.hbs', '*.html', '*.htm', '*.hbs'];
+      if (commonHtmlPatterns.includes(normalizedPattern)) {
+        return htmlExtensions.includes(fileExt);
+      }
+    }
+    
     // Normalize patterns like "**/*.html" to match files in any directory
-    if (globPattern.startsWith('**/')) {
+    if (normalizedPattern.startsWith('**/')) {
       // If we're matching a pattern like "**/*.html", check if the file ends with the extension
-      const extensionMatch = globPattern.match(/\*\*\/\*(\.\w+)$/);
+      const extensionMatch = normalizedPattern.match(/\*\*\/\*(\.\w+)$/);
       if (extensionMatch && extensionMatch[1]) {
-        const extensionToMatch = extensionMatch[1];
-        if (filePath.endsWith(extensionToMatch) || (fileName && fileName.endsWith(extensionToMatch))) {
+        const extensionToMatch = extensionMatch[1].toLowerCase();
+        if (normalizedFilePath.endsWith(extensionToMatch) || 
+            (fileName && fileName.toLowerCase().endsWith(extensionToMatch))) {
           return true;
         }
       }
     }
     
     // Handle extension-only patterns like ".html", ".hbs"
-    if (globPattern.startsWith('.') && !globPattern.includes('/') && !globPattern.includes('*')) {
-      if (filePath.endsWith(globPattern) || (fileName && fileName.endsWith(globPattern))) {
+    if (normalizedPattern.startsWith('.') && !normalizedPattern.includes('/') && !normalizedPattern.includes('*')) {
+      if (normalizedFilePath.endsWith(normalizedPattern) || 
+          (fileName && fileName.toLowerCase().endsWith(normalizedPattern))) {
         return true;
       }
     }
     
     // For patterns like "source/**/*.html" or "public/**/*.html", extract just the extension
-    const fullPathExtensionMatch = globPattern.match(/\*\*\/\*(\.\w+)$/);
+    const fullPathExtensionMatch = normalizedPattern.match(/\*\*\/\*(\.\w+)$/);
     if (fullPathExtensionMatch && fullPathExtensionMatch[1]) {
-      const extensionToMatch = fullPathExtensionMatch[1];
-      if (filePath.endsWith(extensionToMatch) || (fileName && fileName.endsWith(extensionToMatch))) {
+      const extensionToMatch = fullPathExtensionMatch[1].toLowerCase();
+      if (normalizedFilePath.endsWith(extensionToMatch) || 
+          (fileName && fileName.toLowerCase().endsWith(extensionToMatch))) {
+        return true;
+      }
+    }
+    
+    // Add special handling for patterns with just extension (e.g., "html", without the dot)
+    const extensionWithoutDot = normalizedPattern.match(/^(\w+)$/);
+    if (extensionWithoutDot && extensionWithoutDot[1]) {
+      const extToMatch = `.${extensionWithoutDot[1].toLowerCase()}`;
+      if (fileExt === extToMatch) {
         return true;
       }
     }
@@ -232,7 +275,7 @@ export class OutputWatcher {
       regexPattern = `.*${regexPattern}`;
     }
     
-    const regex = new RegExp(`^${regexPattern}$`);
+    const regex = new RegExp(`^${regexPattern}$`, 'i'); // Case insensitive matching
     
     // Check if either the path or filename match
     if (regex.test(filePath)) {
