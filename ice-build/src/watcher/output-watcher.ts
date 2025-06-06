@@ -173,21 +173,43 @@ export class OutputWatcher {
       }
     }
 
+    // FINAL SAFETY CHECK: Make absolutely sure HTML files never trigger reloads
+    // This is a last-resort check in case any HTML files slip through the earlier filters
+    if (['.html', '.htm', '.hbs'].includes(ext)) {
+      const htmlExcluded = Array.isArray(this.config?.hotreload?.excludeExtensions) && 
+                          this.config.hotreload.excludeExtensions.some((e: any) => 
+                            typeof e === 'string' && 
+                            e.toLowerCase() === ext.toLowerCase());
+                            
+      // Force exclude all HTML files if configured to do so or if HTML is disabled
+      if (htmlExcluded || this.config?.html?.disabled === true) {
+        this.logger.debug(`🛑 FINAL SAFETY: Blocking HTML file from triggering reload: ${fileName}`);
+        return;
+      } else {
+        // Log a warning that an HTML file is being processed despite potential configuration
+        this.logger.warn(`⚠️ HTML file not excluded by config - check your configuration: ${fileName}`);
+      }
+    }
+    
     // At this point, we've passed all the exclusion checks,
     // so the file should trigger a hot reload
     
-    // Handle different file types
+    // FINAL SAFETY: Block all HTML files regardless of configuration
+    // This ensures HTML files NEVER trigger hot reloads
+    if (['.html', '.htm', '.hbs'].includes(ext)) {
+      this.logger.debug(`🛑 ABSOLUTE BLOCK: HTML files are completely disabled for hot reload: ${fileName}`);
+      return;
+    }
+    
+    // Handle different file types (HTML files are blocked above)
     if (ext === '.css') {
       this.logger.info(`Detected CSS change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('css', filePath);
     } else if (ext === '.js') {
       this.logger.info(`Detected JS change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('full', filePath);
-    } else if (['.html', '.htm', '.hbs'].includes(ext)) {
-      this.logger.info(`Detected HTML change in output: ${fileName}`);
-      this.hotReloadServer.notifyClients('full', filePath);
     } else {
-      // For any other file type
+      // For any other file type (HTML files are already blocked above)
       this.logger.info(`Detected change in output: ${fileName}`);
       this.hotReloadServer.notifyClients('full', filePath);
     }

@@ -161,8 +161,12 @@ describe('OutputWatcher Exclude Extensions', () => {
     const htmlFile = path.join(outputDir, 'index.html');
     changeHandler(htmlFile);
     
-    // Should notify clients since nothing is excluded
-    expect(mockHotReloadServer.notifyClients).toHaveBeenCalledWith('full', htmlFile);
+    // HTML files are now ALWAYS blocked regardless of configuration
+    expect(mockHotReloadServer.notifyClients).not.toHaveBeenCalled();
+    // Should log that HTML files are completely disabled
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.stringMatching(/ABSOLUTE BLOCK: HTML files are completely disabled/)
+    );
   });
 
   it('should handle missing config gracefully', () => {
@@ -176,7 +180,11 @@ describe('OutputWatcher Exclude Extensions', () => {
     const htmlFile = path.join(outputDir, 'index.html');
     changeHandler(htmlFile);
     
-    // Should notify clients since no excludeExtensions is configured
-    expect(mockHotReloadServer.notifyClients).toHaveBeenCalledWith('full', htmlFile);
+    // HTML files are now ALWAYS blocked regardless of configuration
+    expect(mockHotReloadServer.notifyClients).not.toHaveBeenCalled();
+    // Should log that HTML files are completely disabled
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.stringMatching(/ABSOLUTE BLOCK: HTML files are completely disabled/)
+    );
   });
 });
