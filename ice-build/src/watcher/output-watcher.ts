@@ -16,6 +16,12 @@ const logger = new Logger('OutputWatcher');
  * - If the file is a .css file, the watcher will call `notifyClients` on the hot reload server with type 'css'.
  * - For .js files and .html files, the watcher will call `notifyClients` with type 'full'.
  * - Files starting with underscore (_) or dot (.) are skipped as they are typically partials or temporary files.
+ * 
+ * Batching:
+ * - File changes are batched together to avoid multiple rapid-fire hot reload notifications.
+ * - The batch delay can be configured via `config.hotreload.batchDelay` (default: 150ms).
+ * - CSS changes are processed individually as they're less disruptive than full page reloads.
+ * - Multiple full reload changes are consolidated into a single full reload notification.
  */
 export class OutputWatcher {
   private watcher: chokidar.FSWatcher | null = null;
@@ -24,6 +30,11 @@ export class OutputWatcher {
   private hotReloadServer: HotReloadServer;
   private config: any;
   private logger: Logger;
+  
+  // Batching properties for pooling file changes
+  private pendingChanges: Set<string> = new Set();
+  private batchTimer: NodeJS.Timeout | null = null;
+  private batchDelay: number = 150; // ms to wait before sending batched updates
 
   /**
    * Create a new output folder watcher
@@ -36,7 +47,13 @@ export class OutputWatcher {
     this.hotReloadServer = hotReloadServer;
     this.config = config;
     this.logger = new Logger('OutputWatcher');
+    
+    // Configure batch delay (default 150ms, configurable via config.hotreload.batchDelay)
+    // Use ?? instead of || to properly handle 0 as a valid value
+    this.batchDelay = config?.hotreload?.batchDelay ?? 150;
+    
     logger.debug(`OutputWatcher initialized for directory: ${outputDir}`);
+    logger.debug(`Batch delay set to ${this.batchDelay}ms`);
   }
 
   /**
@@ -91,6 +108,13 @@ export class OutputWatcher {
       this.isWatching = false;
       this.logger.info('Output directory watcher stopped');
     }
+    
+    // Clear any pending batch operations
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+    this.pendingChanges.clear();
   }
 
   /**
@@ -204,15 +228,111 @@ export class OutputWatcher {
     // Handle different file types (HTML files are blocked above)
     if (ext === '.css') {
       this.logger.info(`Detected CSS change in output: ${fileName}`);
-      this.hotReloadServer.notifyClients('css', filePath);
+      this.batchFileChange('css', filePath);
     } else if (ext === '.js') {
       this.logger.info(`Detected JS change in output: ${fileName}`);
-      this.hotReloadServer.notifyClients('full', filePath);
+      this.batchFileChange('full', filePath);
     } else {
       // For any other file type (HTML files are already blocked above)
       this.logger.info(`Detected change in output: ${fileName}`);
-      this.hotReloadServer.notifyClients('full', filePath);
+      this.batchFileChange('full', filePath);
     }
+  }
+
+  /**
+   * Batch file changes to avoid multiple rapid-fire hot reload notifications
+   * @param type The type of reload ('css' or 'full')
+   * @param filePath Path to the changed file
+   */
+  private batchFileChange(type: 'css' | 'full', filePath: string): void {
+    const changeKey = `${type}:${filePath}`;
+    this.pendingChanges.add(changeKey);
+    
+    this.logger.debug(`Batching change: ${changeKey}, batchDelay: ${this.batchDelay}`);
+    
+    // If batch delay is 0, process immediately (useful for testing)
+    if (this.batchDelay === 0) {
+      this.logger.debug(`Processing immediately (batchDelay=0)`);
+      this.processBatchedChanges();
+      return;
+    }
+    
+    // Clear existing timer and start a new one
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+    }
+    
+    this.batchTimer = setTimeout(() => {
+      this.processBatchedChanges();
+    }, this.batchDelay);
+  }
+
+  /**
+   * Force processing of any pending batched changes immediately.
+   * Useful for testing or when you need to ensure all changes are processed.
+   */
+  public flushBatchedChanges(): void {
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+    this.processBatchedChanges();
+  }
+
+  /**
+   * Process all batched file changes and send appropriate notifications
+   */
+  private processBatchedChanges(): void {
+    this.logger.debug(`Processing batched changes: ${this.pendingChanges.size} pending`);
+    
+    if (this.pendingChanges.size === 0) {
+      this.logger.debug(`No pending changes to process`);
+      return;
+    }
+
+    // Group changes by type
+    const cssChanges: string[] = [];
+    const fullChanges: string[] = [];
+    
+    for (const changeKey of this.pendingChanges) {
+      const [type, filePath] = changeKey.split(':', 2);
+      if (type === 'css') {
+        cssChanges.push(filePath);
+      } else {
+        fullChanges.push(filePath);
+      }
+    }
+    
+    // Send notifications - prioritize CSS changes as they're less disruptive
+    if (cssChanges.length > 0) {
+      if (cssChanges.length === 1) {
+        this.logger.info(`📤 Batched CSS refresh: ${path.basename(cssChanges[0])}`);
+        this.hotReloadServer.notifyClients('css', cssChanges[0]);
+      } else {
+        this.logger.info(`📤 Batched CSS refresh: ${cssChanges.length} files`);
+        // For multiple CSS files, we could either send individual notifications
+        // or send a single full reload. CSS reload is generally safe for multiple files.
+        cssChanges.forEach(filePath => {
+          this.hotReloadServer.notifyClients('css', filePath);
+        });
+      }
+    }
+    
+    // If there are any full reload changes, send a single full reload
+    if (fullChanges.length > 0) {
+      if (fullChanges.length === 1) {
+        this.logger.info(`📤 Batched full refresh: ${path.basename(fullChanges[0])}`);
+        this.hotReloadServer.notifyClients('full', fullChanges[0]);
+      } else {
+        this.logger.info(`📤 Batched full refresh: ${fullChanges.length} files`);
+        // For multiple full reloads, just send one full reload notification
+        this.hotReloadServer.notifyClients('full', fullChanges[0]);
+      }
+    }
+    
+    // Clear the batch
+    this.pendingChanges.clear();
+    this.batchTimer = null;
   }
 
   /**

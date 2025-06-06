@@ -54,7 +54,8 @@ describe('OutputWatcher Exclude Extensions', () => {
     // Create test config with excludeExtensions
     mockConfig = {
       hotreload: {
-        excludeExtensions: ['.html', '.htm', '.hbs', '.map', '.d.ts']
+        excludeExtensions: ['.html', '.htm', '.hbs', '.map', '.d.ts'],
+        batchDelay: 0 // Disable batching for tests to get immediate responses
       }
     };
     
@@ -66,6 +67,7 @@ describe('OutputWatcher Exclude Extensions', () => {
     
     // Create OutputWatcher instance with config
     outputWatcher = new OutputWatcher(outputDir, mockHotReloadServer, mockConfig);
+    outputWatcher.start(); // Start the watcher in beforeEach so all tests have it running
   });
 
   afterEach(() => {
@@ -73,8 +75,6 @@ describe('OutputWatcher Exclude Extensions', () => {
   });
 
   it('should exclude HTML files from triggering reloads', () => {
-    outputWatcher.start();
-    
     const changeHandler = capturedHandlers['change'];
     expect(changeHandler).toBeDefined();
     
@@ -92,8 +92,6 @@ describe('OutputWatcher Exclude Extensions', () => {
   });
 
   it('should exclude HBS files from triggering reloads', () => {
-    outputWatcher.start();
-    
     const changeHandler = capturedHandlers['change'];
     
     // Test with HBS file
@@ -105,8 +103,6 @@ describe('OutputWatcher Exclude Extensions', () => {
   });
 
   it('should exclude files with mixed case extensions', () => {
-    outputWatcher.start();
-    
     const changeHandler = capturedHandlers['change'];
     
     // Test with mixed case extensions
@@ -118,8 +114,6 @@ describe('OutputWatcher Exclude Extensions', () => {
   });
 
   it('should handle CSS files correctly (not excluded)', () => {
-    outputWatcher.start();
-    
     const changeHandler = capturedHandlers['change'];
     
     // Test with CSS file (not excluded)
@@ -131,8 +125,6 @@ describe('OutputWatcher Exclude Extensions', () => {
   });
 
   it('should handle JS files correctly (not excluded)', () => {
-    outputWatcher.start();
-    
     const changeHandler = capturedHandlers['change'];
     
     // Test with JS file (not excluded)
@@ -147,7 +139,8 @@ describe('OutputWatcher Exclude Extensions', () => {
     // Create config with empty excludeExtensions
     const emptyConfig = {
       hotreload: {
-        excludeExtensions: []
+        excludeExtensions: [],
+        batchDelay: 0 // Disable batching for tests
       }
     };
     

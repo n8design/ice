@@ -56,8 +56,9 @@ describe('OutputWatcher', () => {
       return mockWatcher;
     });
     
-    // Create OutputWatcher instance
-    outputWatcher = new OutputWatcher(outputDir, mockHotReloadServer);
+    // Create OutputWatcher instance with batchDelay: 0 for immediate processing in tests
+    const testConfig = { hotreload: { batchDelay: 0 } };
+    outputWatcher = new OutputWatcher(outputDir, mockHotReloadServer, testConfig);
   });
 
   it('should start watching the output directory', () => {
