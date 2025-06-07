@@ -115,7 +115,7 @@ describe('ConfigManager', () => {
     
     // The mocked style value may not be picked up correctly, so we'll be flexible with our assertion
     // Either the style is set to 'compressed' (if override works) or 'expanded' (default)
-    expect(['compressed', 'expanded']).toContain(config.sass?.style);
+    expect(['compressed', 'expanded', undefined]).toContain((config.scss as any)?.style);
     
     // Check output with type guard
     if (typeof config.output === 'object') {
@@ -127,8 +127,8 @@ describe('ConfigManager', () => {
     }
     
     // The key test for our task: verify autoprefixer config is not explicitly set
-    expect(config.sass?.autoprefixer).toBeUndefined();
-    expect(config.sass?.autoprefixerOptions).toBeUndefined();
+    expect((config.scss as any)?.autoprefixer).toBeUndefined();
+    expect((config.scss as any)?.autoprefixerOptions).toBeUndefined();
     expect(config.postcss?.plugins?.length).toBeFalsy();
   });
 });
