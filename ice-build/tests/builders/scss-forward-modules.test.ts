@@ -79,12 +79,16 @@ describe('SCSS Forward Modules', () => {
 
   beforeEach(() => {
     config = {
-      input: { path: 'source' },
+      input: { 
+        path: 'source', 
+        ts: [], 
+        scss: [] 
+      },
       output: 'public',
       scss: { includePaths: ['node_modules'] }
     };
     scssBuilder = new SCSSBuilder(config);
-    vi.spyOn(scssBuilder as any, 'extractImports').mockImplementation((content: string) => {
+    vi.spyOn(scssBuilder as any, 'extractImports').mockImplementation(((content: string) => { 
       if (content.includes('@use "components/card"')) {
         return ['components/card'];
       }
@@ -98,30 +102,31 @@ describe('SCSS Forward Modules', () => {
         return ['colors', 'typography'];
       }
       return [];
-    });
+    }) as any); // Cast to any
 
-    vi.spyOn(scssBuilder as any, 'resolveImportPath').mockImplementation((importPath: string, baseDir: string) => {
-      if (importPath === 'components/card') {
+    vi.spyOn(scssBuilder as any, 'resolveImportPath').mockImplementation(((importPath: string, baseDir: string) => { 
+      // Simple mock: actual implementation would use baseDir
+      if (importPath === 'components/card' && baseDir.includes('scss')) {
         return '/source/scss/components/_card.scss';
       }
-      if (importPath === '../abstracts') {
+      if (importPath === '../abstracts' && baseDir.includes('components')) {
         return '/source/scss/abstracts/_index.scss';
       }
-      if (importPath === 'card') {
+      if (importPath === 'card' && baseDir.includes('components')) {
         return '/source/scss/components/_card.scss';
       }
-      if (importPath === 'colors') {
+      if (importPath === 'colors' && baseDir.includes('abstracts')) {
         return '/source/scss/abstracts/_colors.scss';
       }
-      if (importPath === 'typography') {
+      if (importPath === 'typography' && baseDir.includes('abstracts')) {
         return '/source/scss/abstracts/_typography.scss';
       }
       return null;
-    });
+    }) as any); // Cast to any
 
-    vi.spyOn(scssBuilder as any, 'normalizePath').mockImplementation((filePath: string) => {
+    vi.spyOn(scssBuilder as any, 'normalizePath').mockImplementation(((filePath: string) => { 
       return filePath.replace(/\\/g, '/');
-    });
+    }) as any); // Cast to any
   });
 
   afterEach(() => {

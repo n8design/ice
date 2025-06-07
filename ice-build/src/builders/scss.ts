@@ -42,39 +42,46 @@ export class SCSSBuilder extends EventEmitter implements Builder {
   /**
    * Constructor
    * @param config ICE configuration
-   * @param outputDir Optional output directory override
+   * @param outputDirOptional Optional output directory override (note: changed name for clarity)
    */
-  constructor(config: IceConfig, outputDir?: string) {
+  constructor(config: IceConfig, outputDirOptional?: string) {
     super();
     this.config = config;
-    
-    // Check for verbose logging option safely
+    logger.debug(`SCSSBuilder constructor: Initial config received: ${JSON.stringify(config, null, 2)}`);
+    logger.debug(`SCSSBuilder constructor: Optional outputDirOptional parameter: ${outputDirOptional}`);
+
     this.verboseLogging = 
       (this.config as any).debug === true || 
       ((this.config as any).logging?.verbose === true) || 
+      ((this.config as any).advanced?.verbose === true) || // Check advanced.verbose
       process.env.ICE_DEBUG === 'true';
 
-    // Handle different output configurations
-    if (outputDir) {
-      this.outputDir = outputDir;
+    if (outputDirOptional) {
+      this.outputDir = outputDirOptional;
+      logger.debug(`SCSSBuilder constructor: this.outputDir set from outputDirOptional parameter: ${this.outputDir}`);
     } else if (typeof this.config.output === 'string') {
       this.outputDir = this.config.output;
+      logger.debug(`SCSSBuilder constructor: this.outputDir set from config.output (string): ${this.outputDir}`);
     } else if (this.config.output && typeof this.config.output === 'object' && 'path' in this.config.output) {
       this.outputDir = this.config.output.path;
+      logger.debug(`SCSSBuilder constructor: this.outputDir set from config.output.path (object): ${this.outputDir}`);
     } else {
       this.outputDir = 'public'; // Default fallback
+      logger.debug(`SCSSBuilder constructor: this.outputDir set to fallback 'public'. Config output was: ${JSON.stringify(this.config.output)}`);
     }
     
-    // Create output directory immediately 
+    // Create output directory immediately if it doesn't exist (using the final this.outputDir)
+    // This is for the base output directory, not subdirectories like 'css'
     if (!fs.existsSync(this.outputDir)) {
       try {
         fs.mkdirSync(this.outputDir, { recursive: true });
-      } catch (e) {
-        // Ignore directory creation errors in constructor
+        logger.debug(`SCSSBuilder constructor: Ensured base output directory exists: ${this.outputDir}`);
+      } catch (e: any) {
+        logger.warn(`SCSSBuilder constructor: Failed to create base output directory ${this.outputDir}: ${e.message}`);
+        // Not throwing, as sub-directory creation will be attempted later
       }
     }
     
-    // Initialize empty dependency graph
     this.dependencyGraph = new Map<string, SassDependency>();
   }
 
@@ -808,77 +815,156 @@ export class SCSSBuilder extends EventEmitter implements Builder {
    * Calculate output path for SCSS file
    * @param filePath Path to SCSS file
    */
-  private getOutputPath(filePath: string): string {
-    // Simplify the output path calculation
-    const sourcePath = path.resolve(process.cwd(), 'source');
-    let relativePath = '';
-    
-    if (filePath.startsWith(sourcePath)) {
-      // If file is directly under the source directory
-      relativePath = path.relative(sourcePath, filePath);
+  public getOutputPath(inputFile: string): string {
+    logger.debug(`getOutputPath: Called for inputFile: ${inputFile}`);
+    // Expanded logging for the critical config parts:
+    if (this.config && this.config.scss) {
+      logger.debug(`getOutputPath: this.config.scss object BEFORE check: ${JSON.stringify(this.config.scss, null, 2)}`);
+      logger.debug(`getOutputPath: Value of this.config.scss.outDir BEFORE check: "${this.config.scss.outDir}" (Type: ${typeof this.config.scss.outDir})`);
+      logger.debug(`getOutputPath: Truthiness of this.config.scss: ${!!this.config.scss}`);
+      logger.debug(`getOutputPath: Truthiness of this.config.scss.outDir: ${!!this.config.scss.outDir}`);
+    } else if (this.config) {
+      logger.debug(`getOutputPath: this.config.scss object is UNDEFINED or NULL.`);
     } else {
-      // Try to match against configured source paths
-      const patterns = this.config.input.scss;
-      let matched = false;
-      
-      for (const pattern of patterns) {
-        // Extract base directory from glob pattern
-        const baseDir = pattern.replace(/\/\*\*\/\*\.[^.]+$|\*\*\/\*\.[^.]+$|\*\.[^.]+$/g, '');
-        
-        if (filePath.startsWith(baseDir)) {
-          relativePath = path.relative(baseDir, filePath);
-          matched = true;
-          break;
-        }
+      logger.debug(`getOutputPath: this.config object is UNDEFINED or NULL.`);
+    }
+    logger.debug(`getOutputPath: Current this.outputDir (base output path from constructor): ${this.outputDir}`);
+
+    let baseOutputDirForScss: string;
+
+    // The critical condition:
+    if (this.config && this.config.scss && this.config.scss.outDir && typeof this.config.scss.outDir === 'string' && this.config.scss.outDir.trim() !== '') {
+      logger.debug(`getOutputPath: CONDITION MET. Using scss.outDir: "${this.config.scss.outDir}"`);
+      if (path.isAbsolute(this.config.scss.outDir)) {
+        baseOutputDirForScss = this.config.scss.outDir;
+      } else {
+        baseOutputDirForScss = path.resolve(process.cwd(), this.config.scss.outDir);
       }
-      
-      if (!matched) {
-        // Fallback - use the file name only
-        relativePath = path.basename(filePath);
+      logger.debug(`getOutputPath: Resolved baseOutputDirForScss from scss.outDir: ${baseOutputDirForScss}`);
+    } else {
+      logger.debug(`getOutputPath: CONDITION NOT MET. Falling back to global outputDir: "${this.outputDir}"`);
+      if (this.config && this.config.scss && this.config.scss.outDir) {
+        logger.debug(`getOutputPath: Reason for fallback: outDir was present but failed string/trim check. Value: "${this.config.scss.outDir}"`);
+      } else if (this.config && this.config.scss) {
+        logger.debug(`getOutputPath: Reason for fallback: this.config.scss.outDir was falsy or not present.`);
+      } else {
+        logger.debug(`getOutputPath: Reason for fallback: this.config.scss was falsy or not present.`);
       }
+      baseOutputDirForScss = path.resolve(process.cwd(), this.outputDir);
+      logger.debug(`getOutputPath: Resolved baseOutputDirForScss from global outputDir: ${baseOutputDirForScss}`);
     }
 
-    // Convert to CSS extension  
-    const outputRelativePath = relativePath.replace(/\.(scss|sass)$/, '.css');
+    // Now, determine the filename and any subdirectories from output.filenames.css
+    let filenamePattern = '[name].css'; // Default pattern
+    if (typeof this.config.output === 'object' && this.config.output.filenames && this.config.output.filenames.css) {
+      filenamePattern = this.config.output.filenames.css;
+      logger.debug(`getOutputPath: Using filename pattern from output.filenames.css: ${filenamePattern}`);
+    } else {
+      logger.debug(`getOutputPath: Using default filename pattern: ${filenamePattern}`);
+    }
+
+    // Replace [name] placeholder with the actual base name of the input file
+    const baseName = path.basename(inputFile, path.extname(inputFile));
+    let relativeOutputPath = filenamePattern.replace(/\\\[name\\\]/g, baseName);
+    logger.debug(`getOutputPath: Output filename after [name] replacement: ${relativeOutputPath}`);
+
+    // The final output path is baseOutputDirForScss joined with the (potentially nested) relativeOutputPath
+    let finalOutputPath = path.join(baseOutputDirForScss, relativeOutputPath); // Corrected variable name here
+    logger.debug(`getOutputPath: Final calculated output path (pre-normalization): ${finalOutputPath}`);
     
-    // Join with output directory
-    return path.join(this.outputDir, outputRelativePath);
+    // Ensure the directory for the output file exists
+    const outputDirForFile = path.dirname(finalOutputPath);
+    if (!fs.existsSync(outputDirForFile)) {
+      logger.debug(`getOutputPath: Creating output directory for file: ${outputDirForFile}`);
+      try {
+        fs.mkdirSync(outputDirForFile, { recursive: true });
+      } catch (e: any) {
+        logger.error(`getOutputPath: Failed to create directory ${outputDirForFile}: ${e.message}`);
+      }
+    } else {
+      logger.debug(`getOutputPath: Output directory for file already exists: ${outputDirForFile}`);
+    }
+
+    finalOutputPath = path.normalize(finalOutputPath);
+    logger.debug(`getOutputPath: Normalized final output path: ${finalOutputPath}`);
+
+    return finalOutputPath;
   }
 
   /**
-   * Find all SCSS files based on the configured patterns
+   * Find all SCSS files based on the configured patterns or entries.
+   * Priority:
+   * 1. Explicit `input.entries` for SCSS files.
+   * 2. Glob patterns from `input.scss`.
+   * 3. Fallback: Glob all non-partial SCSS/SASS files in `input.path`.
    */
   private async getAllScssFiles(): Promise<string[]> {
-    const files: string[] = [];
-    
-    // Use configured input patterns - never fallback to 'src'
-    const patterns = this.config.input.scss;
-    
-    if (!patterns || patterns.length === 0) {
-      logger.warn('No SCSS input patterns defined in config');
-      return [];
+    const files: Set<string> = new Set<string>();
+    const inputConfig = this.config.input;
+    let baseInputPath = process.cwd(); // Default to CWD if no input path is found
+
+    if (inputConfig) {
+      if (typeof inputConfig === 'string') {
+        baseInputPath = path.resolve(process.cwd(), inputConfig);
+      } else if (inputConfig.path) {
+        baseInputPath = path.resolve(process.cwd(), inputConfig.path);
+      }
     }
-    
-    logger.debug(`Looking for SCSS files with patterns: ${patterns.join(', ')}`);
-    
-    for (const pattern of patterns) {
-      try {
-        const matches = await glob(pattern);
-        logger.debug(`Found ${matches.length} files matching pattern: ${pattern}`);
-        files.push(...matches);
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(`Error finding files for pattern ${pattern}: ${errorMessage}`);
-        
-        // Try to provide more helpful debugging info
-        if (pattern.includes('/**/*.scss') && error instanceof Error && error.message.includes('ENOENT')) {
-          const baseDir = pattern.split('/**/*.scss')[0];
-          logger.error(`Directory ${baseDir} does not exist. Please check your input.scss configuration.`);
+    logger.debug(`SCSS getAllScssFiles: Using baseInputPath: ${baseInputPath}`);
+
+    // Strategy 1: Use explicit entries if available
+    if (inputConfig && typeof inputConfig === 'object' && inputConfig.entries) {
+      logger.debug(`SCSS getAllScssFiles: Checking input.entries...`);
+      for (const entryKey in inputConfig.entries) {
+        const entryValue = inputConfig.entries[entryKey];
+        if (typeof entryValue === 'string' && (entryValue.endsWith('.scss') || entryValue.endsWith('.sass'))) {
+          const filePath = path.resolve(baseInputPath, entryValue);
+          files.add(filePath);
+          logger.debug(`  Added from entry '${entryKey}': ${filePath}`);
         }
       }
     }
+
+    // Strategy 2: Use glob patterns if input.scss is defined
+    if (inputConfig && typeof inputConfig === 'object' && Array.isArray(inputConfig.scss) && inputConfig.scss.length > 0) {
+      logger.debug(`SCSS getAllScssFiles: Checking input.scss glob patterns...`);
+      const globPatterns = inputConfig.scss;
+      for (const pattern of globPatterns) {
+        const absolutePattern = path.isAbsolute(pattern) ? pattern : path.resolve(baseInputPath, pattern);
+        try {
+          const matches = await glob(absolutePattern, { nodir: true });
+          logger.debug(`  Glob pattern '${absolutePattern}' found ${matches.length} files.`);
+          matches.forEach(match => files.add(path.resolve(match)));
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          logger.error(`  Error finding files for pattern ${absolutePattern}: ${errorMessage}`);
+        }
+      }
+    }
+
+    // Strategy 3: Fallback - glob all SCSS/SASS files in the baseInputPath if no files found yet
+    // This ensures that if entries or input.scss are not used, but SCSS files exist in the source dir, they are picked up.
+    if (files.size === 0 && !(inputConfig && typeof inputConfig === 'object' && Array.isArray(inputConfig.scss) && inputConfig.scss.length > 0)) {
+      logger.debug(`SCSS getAllScssFiles: No files from entries or input.scss. Falling back to globbing all non-partial SCSS/SASS files in ${baseInputPath}`);
+      const globPattern = path.join(baseInputPath, '**/*.{scss,sass}');
+      try {
+        const matches = await glob(globPattern, { nodir: true });
+        const nonPartialMatches = matches.filter(match => !path.basename(match).startsWith('_'));
+        logger.debug(`  Fallback glob '${globPattern}' found ${nonPartialMatches.length} non-partial files.`);
+        nonPartialMatches.forEach(match => files.add(path.resolve(match)));
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error(`  Error during fallback glob in ${baseInputPath}: ${errorMessage}`);
+      }
+    }
+
+    if (files.size === 0) {
+      logger.warn('SCSS getAllScssFiles: No SCSS files found to process based on configuration (entries, input.scss, or fallback glob).');
+    }
     
-    return files;
+    const resolvedFiles = Array.from(files);
+    logger.debug(`SCSS getAllScssFiles: Resolved files to process: ${JSON.stringify(resolvedFiles, null, 2)}`);
+    return resolvedFiles;
   }
 
   /**
@@ -1170,108 +1256,112 @@ export class SCSSBuilder extends EventEmitter implements Builder {
       try {
         await fsPromises.access(filePath, fs.constants.R_OK);
       } catch (error) {
-        logger.error(`Cannot access SCSS file ${path.basename(filePath)}: file may not exist`);
+        logger.error(`Cannot access SCSS file ${path.basename(filePath)}: file may not exist or is not readable.`);
+        this.emit('error', `Cannot access SCSS file ${path.basename(filePath)}`);
         return;
       }
       
-      const outputPath = this.getOutputPath(filePath);
-      const outputDir = path.dirname(outputPath);
-      const mapPath = `${outputPath}.map`;
+      const outputCssPath = this.getOutputPath(filePath);
+      const outputCssDir = path.dirname(outputCssPath);
+      const outputMapPath = `${outputCssPath}.map`;
       
-      logger.info(`Processing SCSS: ${path.basename(filePath)} -> ${path.basename(outputPath)}`);
+      if (this.verboseLogging) {
+        logger.info(`Processing SCSS: Input='${filePath}', OutputCSS='${outputCssPath}', OutputMap='${outputMapPath}'`);
+      } else {
+        logger.info(`Processing SCSS: ${path.basename(filePath)} -> ${path.relative(process.cwd(), outputCssPath)}`);
+      }
 
-      const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
+      const absoluteInputPath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
 
       try {
-        // Sass compilation with config settings
-        const useSourceMap = this.config.sass?.sourceMap ?? true;
-        const sassStyle = this.config.sass?.style || 'expanded';
+        const scssConfig = this.config.scss || {};
+        const postcssConfigUser = (this.config.postcss || {}) as { plugins?: any[] }; // Type assertion for user plugins
+
+        const useSourceMap = scssConfig.sourceMap ?? true;
+        const sassStyle = (scssConfig as any).style || 'expanded'; // Allow style from config, default to expanded
         
-        // Get include paths from config
         const includePaths: string[] = [];
-        
-        // Fix: Check for both sass and scss properties
-        const sassConfig = this.config.sass || {};
-        const scssConfig = (this.config as any).scss || {};
-        
-        // Use includePaths from either sass or scss property
-        if (Array.isArray(sassConfig.includePaths)) {
-          includePaths.push(...sassConfig.includePaths);
+        if (Array.isArray(scssConfig.includePaths)) includePaths.push(...scssConfig.includePaths);
+
+        let inputBasePath = '';
+        if (this.config.input && typeof this.config.input === 'object' && this.config.input.path) {
+            inputBasePath = path.resolve(process.cwd(), this.config.input.path);
+        } else if (typeof this.config.input === 'string') {
+            inputBasePath = path.resolve(process.cwd(), this.config.input);
         }
-        
-        if (Array.isArray(scssConfig.includePaths)) {
-          includePaths.push(...scssConfig.includePaths);
+        if (inputBasePath && !includePaths.includes(inputBasePath)) {
+            includePaths.push(inputBasePath);
         }
-        
-        // Add source directories
-        if (Array.isArray(this.config.input?.scss)) {
-          includePaths.push(
-            ...this.config.input.scss.map(p => p.replace(/\/\*\*\/\*\.scss|\*\*\/\*\.scss|\*\.scss/g, ''))
-          );
-        }
-        
-        // console.log(scssConfig);
-        // console.log('Sass loadPaths: Before', includePaths);
         
         includePaths.push(...this.getNodeModulesPaths());
+        includePaths.push(path.resolve(process.cwd(), 'node_modules'));
 
-        // Right before the sass.compile call, add:
-        includePaths.push(
-          path.resolve(process.cwd(), 'node_modules')
-        );
+        const uniqueIncludePaths = [...new Set(includePaths)];
 
-        // console.log('Sass loadPaths: After', includePaths);
-
-        const result = sass.compile(absolutePath, {
-          style: sassStyle,
+        const result = sass.compile(absoluteInputPath, {
+          style: sassStyle as sass.OutputStyle, // Cast to sass.OutputStyle
           sourceMap: useSourceMap,
           sourceMapIncludeSources: useSourceMap,
-          loadPaths: includePaths
+          loadPaths: uniqueIncludePaths
         });
 
-        // After successful Sass compilation:
+        logger.info(`SCSS: Compiled ${path.basename(filePath)} to CSS. Output target: ${outputCssPath}`);
+
+        if (!fs.existsSync(outputCssDir)) {
+          try {
+            fs.mkdirSync(outputCssDir, { recursive: true });
+            logger.info(`SCSS: Created output directory: ${outputCssDir}`);
+          } catch (e: any) {
+            logger.error(`SCSS: Failed to create directory ${outputCssDir}: ${e.message}`);
+            this.emit('error', `Failed to create directory ${outputCssDir}: ${e.message}`);
+            return;
+          }
+        }
+
         if (result.css) {
-          // Process with PostCSS
-          const postcssPlugins = [
-            // Use autoprefixer with standard browserslist configuration discovery
-            autoprefixer({
-              // Empty options object ensures default browserslist discovery behavior
-            }),
-            ...(Array.isArray(this.config.postcss?.plugins) ? this.config.postcss.plugins : [])
-          ];
+          const postcssPlugins = [];
+          const useAutoprefixer = scssConfig.autoprefixer ?? true;
+          if (useAutoprefixer) {
+             const autoprefixerOptions = scssConfig.autoprefixerOptions ?? {};
+             postcssPlugins.push(autoprefixer(autoprefixerOptions));
+          }
+          if (Array.isArray(postcssConfigUser.plugins)) {
+            postcssPlugins.push(...postcssConfigUser.plugins);
+          }
           
           const postcssResult = await postcss(postcssPlugins)
             .process(result.css, { 
-              from: outputPath,
-              to: outputPath,
-              map: useSourceMap ? { inline: false } : false
+              from: absoluteInputPath, 
+              to: outputCssPath, 
+              map: useSourceMap ? { inline: false, prev: result.sourceMap ? JSON.stringify(result.sourceMap) : undefined, annotation: true } : false
             });
 
-          // Write processed CSS
-          await fsPromises.mkdir(outputDir, { recursive: true });
-          await fsPromises.writeFile(outputPath, postcssResult.css);
+          await fsPromises.mkdir(outputCssDir, { recursive: true });
+          logger.debug(`SCSS processScssFile: About to write CSS file to: ${outputCssPath}`);
+          await fsPromises.writeFile(outputCssPath, postcssResult.css);
           
-          // Write source map if enabled
           if (useSourceMap && postcssResult.map) {
-            await fsPromises.writeFile(mapPath, postcssResult.map.toString());
+            logger.debug(`SCSS processScssFile: About to write CSS map file to: ${outputMapPath}`);
+            await fsPromises.writeFile(outputMapPath, postcssResult.map.toString());
           }
 
-          logger.info(`Built CSS: ${path.basename(outputPath)}`);
+          logger.success(`Built CSS: ${path.relative(process.cwd(), outputCssPath)}`);
+          this.emit('fileProcessed', outputCssPath);
         }
-      } catch (error) {
-        logger.error(`Failed to compile ${path.basename(filePath)}: ${error instanceof Error ? error.message : String(error)}`);
-        
-        // Create fallback CSS for failed compilations
+      } catch (error: any) {
+        logger.error(`Failed to compile/process ${path.basename(filePath)}: ${error.message}`);
+        this.emit('error', `Compilation failed for ${filePath}: ${error.message}`);
         try {
-          await fsPromises.mkdir(outputDir, { recursive: true });
-          await fsPromises.writeFile(outputPath, `/* Error compiling ${path.basename(filePath)} */\n`);
-          logger.info(`Created fallback CSS for ${path.basename(filePath)}`);
-        } catch (fallbackError) {
-          logger.error(`Failed to create fallback CSS: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
+          if (!fs.existsSync(outputCssDir)) fs.mkdirSync(outputCssDir, { recursive: true });
+          // Corrected the replace call for the fallback CSS
+          await fsPromises.writeFile(outputCssPath, `/* Error compiling ${path.basename(filePath)}: ${error.message.replace(/\*\//g, '* / ')} */`);
+        } catch (fallbackError: any) {
+          logger.error(`Failed to write error fallback CSS for ${filePath}: ${fallbackError.message}`);
         }
       }
-    } catch (error) {
-      logger.error(`Error processing SCSS file: ${error instanceof Error ? error.message : String(error)}`);
+    } catch (error: any) {
+      logger.error(`Error processing SCSS file ${filePath}: ${error.message}`);
+      this.emit('error', `Error processing SCSS file ${filePath}: ${error.message}`);
     }
   }
 

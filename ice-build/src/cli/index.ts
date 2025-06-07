@@ -34,7 +34,7 @@ function registerCheckCommand(program: Command): void {
     .description('Check if all source directories exist')
     .option('--config <path>', 'Path to config file')
     .action((options) => {
-      checkDirectories(options.config);
+      checkDirectories(); // Remove options.config argument
     });
 }
 

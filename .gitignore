@@ -173,3 +173,9 @@ tsconfig.tsbuildinfo
 # Nx
 .nx/
 .vscode/mcp.json
+
+*.bak
+*.js
+*.md
+/public/
+/test-output/

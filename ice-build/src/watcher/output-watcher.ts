@@ -134,6 +134,12 @@ export class OutputWatcher {
       return;
     }
     
+    // Skip source map files - they should never trigger hot reloads
+    if (ext === '.map') {
+      this.logger.debug(`⏭️ Skipping source map file: ${fileName}`);
+      return;
+    }
+    
     // Direct extension checks first (most efficient)
     // Check if this type of file is explicitly excluded by extension
     if (['.html', '.htm', '.hbs'].includes(ext)) {

@@ -32,6 +32,7 @@ export interface IceConfig {
     sourceMap?: boolean;
     autoprefixer?: boolean;
     autoprefixerOptions?: Record<string, any>;
+    outDir?: string; // New option for SCSS specific output directory
   };
   typescript?: {
     target?: string;

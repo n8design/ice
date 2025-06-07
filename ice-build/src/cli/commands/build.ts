@@ -28,31 +28,16 @@ async function executeBuildCommand(options: {
 } = {}): Promise<void> {
   try {
     logger.info('Starting build');
+    logger.debug(`Build command options received: ${JSON.stringify(options, null, 2)}`); // DEBUG
     
     // Dynamically import to avoid TypeScript errors
     const configModule = await import('../../config/index.js');
+    logger.debug(`Loaded configModule: ${typeof configModule}`); // DEBUG
     const BuildManagerModule = await import('../../builders/index.js');
-    
-    // Get configuration - use type assertion and await the function calls
-    let config: any = {
-      // Provide default minimal IceConfig structure
-      input: {
-        ts: ['src/**/*.ts', 'source/**/*.ts'],
-        scss: ['src/**/*.scss', 'source/**/*.scss'],
-        html: ['src/**/*.html', 'source/**/*.html'],
-      },
-      output: {
-        path: 'public'
-      }
-    };
-    
-    const configModuleAny = configModule as any;
-    
-    if (typeof configModuleAny.getConfig === 'function') {
-      config = await configModuleAny.getConfig() || config;
-    } else if (typeof configModuleAny.createConfig === 'function') {
-      config = await configModuleAny.createConfig() || config;
-    }
+
+    // Always use async getConfig for robust config loading
+    let config: any = await configModule.getConfig();
+    logger.debug(`Config loaded from getConfig(): ${JSON.stringify(config, null, 2)}`); // DEBUG
     
     // Add graph export options if specified
     if (options.exportGraph) {

@@ -18,32 +18,41 @@ export class TypeScriptBuilder implements Builder {
 
   async build(): Promise<void> {
     logger.info('Building TypeScript files');
-    
     try {
       const entryPoints = await this.resolveEntryPoints();
       logger.info(`Found ${entryPoints.length} TypeScript entry points`);
-
       if (entryPoints.length === 0) {
         logger.warn('No TypeScript files found to build');
         return;
       }
-
       const startTime = Date.now();
-      
       // Configure plugins for SCSS handling in TS
       const plugins = await this.configurePlugins();
-      
+      // --- Determine output directory ---
+      let outDir = this.outputPath;
+      const tsconfigPath = await this.findTsConfig();
+      if (tsconfigPath) {
+        try {
+          const tsconfigContent = await fs.readFile(tsconfigPath, 'utf-8');
+          const tsconfig = JSON.parse(tsconfigContent);
+          if (tsconfig.compilerOptions && tsconfig.compilerOptions.outDir) {
+            outDir = path.resolve(path.dirname(tsconfigPath), tsconfig.compilerOptions.outDir);
+            logger.info(`[TypeScript] Using outDir from tsconfig.json: ${outDir}`);
+          } else {
+            logger.info(`[TypeScript] No outDir in tsconfig.json, using output.path from ice.config.js: ${outDir}`);
+          }
+        } catch (e) {
+          logger.warn(`[TypeScript] Failed to read or parse tsconfig.json for outDir: ${e}`);
+        }
+      }
       await esbuild.build({
         entryPoints,
-        outdir: this.outputPath,
+        outdir: outDir,
         format: 'esm',
         ...this.config.esbuild,
-        // Load tsconfig.json if it exists
-        tsconfig: await this.findTsConfig(),
-        // Add plugins for handling SCSS imports
+        tsconfig: tsconfigPath,
         plugins,
       });
-      
       const endTime = Date.now();
       logger.success(`TypeScript build completed in ${endTime - startTime}ms`);
     } catch (error: any) {
@@ -142,52 +151,21 @@ export class TypeScriptBuilder implements Builder {
    * @param filePath Path to TypeScript file
    */
   private getOutputPath(filePath: string): string {
-    // Simplify the output path calculation
-    const sourcePath = path.resolve(process.cwd(), 'source');
-    let relativePath = '';
-    
-    if (filePath.startsWith(sourcePath)) {
-      // If file is directly under the source directory
-      relativePath = path.relative(sourcePath, filePath);
-      
-      // Special case: if in ts/ directory, move to js/
-      if (relativePath.startsWith('ts/')) {
-        relativePath = relativePath.replace(/^ts\//, 'js/');
-      }
-    } else {
-      // Try to match against configured source paths
-      // Fix: Use 'ts' instead of 'typescript' to match the actual config
-      const patterns = this.config.input.ts || [];
-      let matched = false;
-      
-      for (const pattern of patterns) {
-        // Extract base directory from glob pattern
-        const baseDir = pattern.replace(/\/\*\*\/\*\.[^.]+$|\*\*\/\*\.[^.]+$|\*\.[^.]+$/g, '');
-        
-        if (filePath.startsWith(baseDir)) {
-          relativePath = path.relative(baseDir, filePath);
-          
-          // Special case: if in ts/ directory, move to js/
-          if (relativePath.startsWith('ts/')) {
-            relativePath = relativePath.replace(/^ts\//, 'js/');
-          }
-          
-          matched = true;
-          break;
-        }
-      }
-      
-      if (!matched) {
-        // Fallback - use the file name only
-        relativePath = path.basename(filePath);
-      }
-    }
+    const inputFileBaseName = path.basename(filePath, path.extname(filePath)); // e.g., "app"
 
-    // Convert to JS extension
-    const outputRelativePath = relativePath.replace(/\.ts$/, '.js');
+    let filenamePattern = '[name].js'; // Default pattern
+
+    if (this.config.output && typeof this.config.output === 'object' && this.config.output.filenames && this.config.output.filenames.js) {
+      filenamePattern = this.config.output.filenames.js;
+    }
     
-    // Join with output directory - fix: use this.outputPath instead of this.outputDir
-    return path.join(this.outputPath, outputRelativePath);
+    // Replace [name] placeholder
+    const outputFileNameWithSubDir = filenamePattern.replace('[name]', inputFileBaseName);
+
+    // this.outputPath is already set to config.output.path (e.g., "public")
+    const fullOutputPath = path.join(this.outputPath, outputFileNameWithSubDir);
+
+    return fullOutputPath;
   }
 
   /**

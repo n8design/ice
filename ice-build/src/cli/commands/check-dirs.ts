@@ -4,10 +4,10 @@ import { ConfigManager } from '../../config/index.js';
 
 const logger = new Logger('CheckDirs');
 
-export function checkDirectories(configPath?: string): boolean {
+export function checkDirectories(): boolean {
   logger.info('Checking source directories...');
-  
-  const configManager = new ConfigManager(configPath);
+  // Always use default config (or refactor to async loader if needed)
+  const configManager = new ConfigManager();
   const config = configManager.getConfig();
   
   let allExist = true;

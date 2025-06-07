@@ -11,8 +11,8 @@ export class ConfigManager {
   private config: IceConfig;
   private configPath: string | null = null;
 
-  constructor(configPath?: string) {
-    // Set up a basic initial config
+  constructor() {
+    // Only set up defaults, do NOT load any config file here
     this.config = {
       input: {
         ts: ['source/**/*.ts', 'source/**/*.tsx'],
@@ -22,27 +22,10 @@ export class ConfigManager {
       output: {
         path: 'public'
       },
-      sass: {
-        sourceMap: true,
-        style: 'expanded'
+      scss: {
+        sourceMap: true
       }
     };
-    
-    try {
-      // Find and load config file
-      const configFile = configPath || this.findConfigFile();
-      if (configFile) {
-        this.configPath = configFile;
-        logger.info(`Found config file: ${configFile}`);
-        
-        // Load the config file synchronously for immediate use
-        this.loadConfigSync(configFile);
-      } else {
-        logger.warn('No config file found, using defaults');
-      }
-    } catch (error) {
-      logger.error(`Config error: ${error instanceof Error ? error.message : String(error)}`);
-    }
   }
 
   // Find config file in current directory
@@ -105,22 +88,8 @@ export class ConfigManager {
     }
   }
   
-  // Use a synchronous wrapper for backward compatibility
-  private loadConfigSync(configFile: string): any {
-    // Use a simple regex-based approach for sync loading
-    let config = {};
-    try {
-      const content = fs.readFileSync(configFile, 'utf-8');
-      // Simple extraction for common patterns
-      config = this.extractConfigFromContent(content);
-    } catch (error) {
-      logger.error(`Config load failed: ${error}`);
-    }
-    return config;
-  }
-
   // Apply config with simple merging
-  private applyConfig(userConfig: any): void {
+  public applyConfig(userConfig: any): void {
     // Ensure proper structure
     if (userConfig.input) {
       // Handle input paths
@@ -164,16 +133,24 @@ export class ConfigManager {
       }
     }
     
-    // Set SASS options
-    if (userConfig.sass || userConfig.scss) {
-      const sassConfig = userConfig.sass || userConfig.scss;
-      this.config.sass = {
-        ...this.config.sass,
-        ...sassConfig
+    // Set SASS/SCSS options
+    if (userConfig.scss || userConfig.sass) {
+      const scssOptions = userConfig.scss || userConfig.sass;
+      logger.debug(`User SCSS/Sass options found: ${JSON.stringify(scssOptions, null, 2)}`);
+      // Ensure this.config.scss exists
+      if (!this.config.scss) {
+        this.config.scss = {};
+      }
+      this.config.scss = {
+        ...this.config.scss, // Keep existing defaults or previously set values
+        ...scssOptions       // Override with user's options
       };
+      logger.debug(`Applied SCSS/Sass options. Current this.config.scss: ${JSON.stringify(this.config.scss, null, 2)}`);
+    } else {
+      logger.debug('No user SCSS/Sass options found. Using defaults or existing this.config.scss.');
     }
     
-    logger.debug(`Applied config: ${JSON.stringify(this.config, null, 2)}`);
+    logger.debug(`Final applied config: ${JSON.stringify(this.config, null, 2)}`);
   }
 
   public getConfig(): IceConfig {
@@ -317,3 +294,65 @@ export class ConfigManager {
     }
   }
 }
+
+// --- Robust async config loader for CLI ---
+/**
+ * Loads the user's config file (ice.config.js/mjs/cjs) from the current working directory.
+ * Supports ESM and CJS, object or function export.
+ * Always returns a normalized IceConfig.
+ */
+export async function getConfig(configPath?: string): Promise<IceConfig> {
+  const logger = new Logger('Config');
+  let configFile = configPath;
+  if (!configFile) {
+    // Search for config file in CWD
+    const cwd = process.cwd();
+    const candidates = [
+      path.join(cwd, 'ice.config.js'),
+      path.join(cwd, 'ice.config.mjs'),
+      path.join(cwd, 'ice.config.cjs')
+    ];
+    configFile = candidates.find(f => fs.existsSync(f));
+  }
+  if (!configFile) {
+    logger.warn('No ice.config.js/mjs/cjs found. Using default config.');
+    return new ConfigManager().getConfig();
+  }
+  logger.info(`Loading config from: ${configFile}`);
+  let userConfig: any = {};
+  try {
+    if (configFile.endsWith('.mjs')) {
+      const mod = await import(pathToFileURL(configFile).href);
+      userConfig = mod.default || mod;
+    } else if (configFile.endsWith('.js')) {
+      try {
+        const mod = await import(pathToFileURL(configFile).href);
+        userConfig = mod.default || mod;
+      } catch (e) {
+        logger.debug('ESM import failed, trying require() for CJS...');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const mod = require(configFile);
+        userConfig = mod.default || mod;
+      }
+    } else if (configFile.endsWith('.cjs')) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require(configFile);
+      userConfig = mod.default || mod;
+    }
+    if (typeof userConfig === 'function') {
+      userConfig = await userConfig();
+    }
+    logger.debug('User config loaded: ' + JSON.stringify(userConfig, null, 2));
+  } catch (err) {
+    logger.error('Failed to load user config: ' + err);
+    return new ConfigManager().getConfig();
+  }
+  // Merge/normalize
+  const manager = new ConfigManager();
+  manager.applyConfig(userConfig);
+  logger.info('Final merged config: ' + JSON.stringify(manager.getConfig(), null, 2));
+  return manager.getConfig();
+}
+
+// For compatibility, also export as default
+export default { getConfig };
