@@ -1,0 +1,46 @@
+// CSS Hot Reload Test Styles
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+h1 {
+  color: #9b59b6; // Changed from #2c3e50 to purple to test CSS-only refresh
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.test-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.test-button {
+  background-color: #e74c3c; // Changed from blue to red
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  
+  &:hover {
+    background-color: #c0392b; // Updated hover color
+  }
+}
+
+.status {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #e8f6ff;
+  border-left: 4px solid #3498db;
+  color: #2c3e50;
+}

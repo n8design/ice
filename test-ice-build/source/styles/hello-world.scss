@@ -1,0 +1,16 @@
+@use 'make' as make;
+@use 'make2' as make2;
+@use 'make3' as make3;
+@use 'make4' as make4;
+
+.content{
+    content: "Just another content";
+    background-color: pink;
+    color: magent;
+    font-size: 10px;
+
+    
+
+}
+
+

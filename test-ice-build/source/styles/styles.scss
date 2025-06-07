@@ -1,0 +1,16 @@
+// Import the partial
+@use './_make2';
+
+// Main styles
+body {
+  font-family: Arial, sans-serif;
+  
+  h1 {
+    color: magenta;
+  }
+  
+  p {
+    line-height: 1.6;
+    font-size: 1.5;
+  }
+}
