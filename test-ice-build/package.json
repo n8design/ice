@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "ice-build watch",
-    "build": "ice-build build --clean",
+    "build": "DEBUG=true ice-build build",
     "test": "echo \"No tests configured\"",
     "clean": "rimraf dist/**/*",
     "dev:core": "ice-build watch --config ./ice.config.js"
@@ -23,5 +23,10 @@
   },
   "dependencies": {
     "@n8d/htwoo-core": "^2.7.1"
-  }
+  },
+  "browserslist": [
+    ">0.25%",
+    "not ie 11",
+    "not op_mini all"
+  ]
 }
