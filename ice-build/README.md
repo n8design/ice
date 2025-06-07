@@ -138,6 +138,24 @@ export default {
 };
 ```
 
+## Browserslist and Autoprefixer
+
+Ice Build uses [Autoprefixer](https://github.com/postcss/autoprefixer) for CSS vendor prefixing. To control which browsers are targeted, define a `browserslist` key in your `package.json` or create a `.browserslistrc` file in your project root. This is the recommended approach for all modern CSS tools.
+
+**Example (`package.json`):**
+
+```json
+{
+  "browserslist": [
+    ">0.25%",
+    "not ie 11",
+    "not op_mini all"
+  ]
+}
+```
+
+**Do not use `autoprefixerOptions.browsers` in your config.** Browserslist config is automatically detected and used by Autoprefixer and other tools.
+
 ### Browser Compatibility Configuration
 
 Ice Build uses Autoprefixer to automatically add vendor prefixes to CSS properties. By default, Autoprefixer uses [browserslist](https://github.com/browserslist/browserslist) to determine which prefixes are needed.
