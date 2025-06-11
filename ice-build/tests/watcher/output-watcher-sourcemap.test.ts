@@ -52,8 +52,8 @@ describe('OutputWatcher Source Map Exclusion', () => {
       return mockWatcher;
     });
     
-    // Create OutputWatcher instance
-    outputWatcher = new OutputWatcher(outputDir, mockHotReloadServer);
+    // Create OutputWatcher instance with batchDelay: 0 for immediate notification in tests
+    outputWatcher = new OutputWatcher(outputDir, mockHotReloadServer, { hotreload: { batchDelay: 0 } });
   });
 
   afterEach(() => {
@@ -78,6 +78,7 @@ describe('OutputWatcher Source Map Exclusion', () => {
       sourceMapFiles.forEach(mapFile => {
         changeHandler(mapFile);
       });
+      outputWatcher.flushBatchedChanges();
       
       // Should not notify clients for any source map files
       expect(mockHotReloadServer.notifyClients).not.toHaveBeenCalled();
@@ -100,6 +101,7 @@ describe('OutputWatcher Source Map Exclusion', () => {
       
       changeHandler(cssFile);
       changeHandler(jsFile);
+      outputWatcher.flushBatchedChanges();
       
       // Should notify clients for CSS and JS files
       expect(mockHotReloadServer.notifyClients).toHaveBeenCalledWith('css', cssFile);
@@ -126,6 +128,7 @@ describe('OutputWatcher Source Map Exclusion', () => {
       testFiles.forEach(({ file }) => {
         changeHandler(file);
       });
+      outputWatcher.flushBatchedChanges();
       
       // Only non-map files should trigger notifications
       const expectedNotifications = testFiles.filter(f => f.shouldNotify);
@@ -160,18 +163,20 @@ describe('OutputWatcher Source Map Exclusion', () => {
       mapNamedFiles.forEach(file => {
         changeHandler(file);
       });
-      
       // Process real map files (should NOT trigger notifications)
       realMapFiles.forEach(file => {
         changeHandler(file);
       });
+      outputWatcher.flushBatchedChanges();
       
       // Only map-named files should trigger notifications, not real .map files
       expect(mockHotReloadServer.notifyClients).toHaveBeenCalledTimes(mapNamedFiles.length);
       
       // Verify the right files triggered notifications
       mapNamedFiles.forEach(file => {
-        expect(mockHotReloadServer.notifyClients).toHaveBeenCalledWith('full', file);
+        const ext = path.extname(file);
+        const expectedType = ext === '.css' ? 'css' : 'full';
+        expect(mockHotReloadServer.notifyClients).toHaveBeenCalledWith(expectedType, file);
       });
     });
   });

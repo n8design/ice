@@ -33,6 +33,8 @@ export function registerWatchCommand(program: Command): void {
             path: 'public'
           },
           watch: {
+            // Use common default input directories instead of hardcoded paths
+            // This will be overridden by the actual config loading or by FileWatcher's logic
             paths: ['src', 'source'],
             ignored: ['node_modules', '**/node_modules/**']
           },
@@ -60,6 +62,26 @@ export function registerWatchCommand(program: Command): void {
           logger.debug('Configuration loaded');
         } catch (configError) {
           logger.warn(`Could not load configuration, using defaults: ${configError instanceof Error ? configError.message : String(configError)}`);
+        }
+        
+        // Ensure watch paths are properly derived from input configuration
+        // This helps the FileWatcher logic by ensuring watch.paths reflects the actual input configuration
+        if (!config.watch) {
+          config.watch = {
+            paths: [],
+            ignored: ['node_modules', '**/node_modules/**']
+          };
+        }
+        
+        // If watch.paths is not explicitly set and we have input.path, derive watch paths from it
+        if ((!config.watch.paths || config.watch.paths.length === 0) && (config.input as any)?.path) {
+          config.watch.paths = [(config.input as any).path];
+          logger.debug(`Derived watch paths from input.path: [${(config.input as any).path}]`);
+        }
+        
+        // Ensure ignored patterns exist
+        if (!config.watch.ignored) {
+          config.watch.ignored = ['node_modules', '**/node_modules/**'];
         }
         
         // Create BuildManager

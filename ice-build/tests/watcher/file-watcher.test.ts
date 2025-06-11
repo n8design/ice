@@ -169,4 +169,130 @@ describe('FileWatcher', () => {
     // Skip the specific error check since it depends on implementation details
     // Just check that an error was logged
   }); 
+
+  it('should use input.path as default watch path when watch.paths is not specified', async () => {
+    // Reset singleton before this test
+    FileWatcher.resetInstance();
+    
+    // Create config without watch.paths but with input.path
+    const configWithInputPath = {
+      input: {
+        ts: ['source/**/*.ts'],
+        scss: ['source/**/*.scss'],
+        html: ['source/**/*.html'],
+        path: 'source' // This should be used as the default watch path
+      },
+      output: { path: '/path/to/public' },
+      // No watch.paths specified
+      hotreload: {
+        enabled: true,
+        debounceTime: 50
+      }
+    };
+
+    const fileWatcherWithInputPath = FileWatcher.getInstance(
+      configWithInputPath as IceConfig,
+      mockBuilder as unknown as Builder,
+      null
+    );
+
+    await fileWatcherWithInputPath.start();
+
+    // Should watch the input.path directory
+    expect(mockWatch).toHaveBeenCalledWith(
+      ['source'], // Should use input.path
+      expect.objectContaining({
+        ignored: ['**/node_modules/**', '**/\.*'], // Default ignored patterns
+        persistent: true,
+        ignoreInitial: true
+      })
+    );
+
+    expect(mockLogger.info).toHaveBeenCalledWith('Starting file watcher for paths: source');
+  });
+
+  it('should prefer explicit watch.paths over input.path', async () => {
+    // Reset singleton before this test
+    FileWatcher.resetInstance();
+    
+    // Create config with both watch.paths and input.path
+    const configWithBoth = {
+      input: {
+        ts: ['source/**/*.ts'],
+        scss: ['source/**/*.scss'],
+        html: ['source/**/*.html'],
+        path: 'source' // This should be ignored in favor of watch.paths
+      },
+      output: { path: '/path/to/public' },
+      watch: {
+        paths: ['custom-watch-dir'], // This should take precedence
+        ignored: ['**/node_modules/**']
+      },
+      hotreload: {
+        enabled: true,
+        debounceTime: 50
+      }
+    };
+
+    const fileWatcherWithBoth = FileWatcher.getInstance(
+      configWithBoth as IceConfig,
+      mockBuilder as unknown as Builder,
+      null
+    );
+
+    await fileWatcherWithBoth.start();
+
+    // Should watch the explicit watch.paths, not input.path
+    expect(mockWatch).toHaveBeenCalledWith(
+      ['custom-watch-dir'], // Should use watch.paths
+      expect.objectContaining({
+        ignored: ['**/node_modules/**'],
+        persistent: true,
+        ignoreInitial: true
+      })
+    );
+
+    expect(mockLogger.info).toHaveBeenCalledWith('Starting file watcher for paths: custom-watch-dir');
+  });
+
+  it('should fall back to default src when neither watch.paths nor input.path is specified', async () => {
+    // Reset singleton before this test
+    FileWatcher.resetInstance();
+    
+    // Create config without watch.paths or input.path
+    const configWithNeither = {
+      input: {
+        ts: ['src/**/*.ts'],
+        scss: ['src/**/*.scss'],
+        html: ['src/**/*.html']
+        // No input.path specified
+      },
+      output: { path: '/path/to/public' },
+      // No watch configuration specified
+      hotreload: {
+        enabled: true,
+        debounceTime: 50
+      }
+    };
+
+    const fileWatcherFallback = FileWatcher.getInstance(
+      configWithNeither as IceConfig,
+      mockBuilder as unknown as Builder,
+      null
+    );
+
+    await fileWatcherFallback.start();
+
+    // Should fall back to default 'src'
+    expect(mockWatch).toHaveBeenCalledWith(
+      ['src'], // Should use default fallback
+      expect.objectContaining({
+        ignored: ['**/node_modules/**', '**/\.*'], // Default ignored patterns
+        persistent: true,
+        ignoreInitial: true
+      })
+    );
+
+    expect(mockLogger.info).toHaveBeenCalledWith('Starting file watcher for paths: src');
+  });
 });

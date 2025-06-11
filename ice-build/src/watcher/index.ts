@@ -54,7 +54,18 @@ export class FileWatcher {
       return;
     }
 
-    const watchPaths = this.config.watch?.paths || ['src'];
+    // Determine watch paths: use config.watch.paths if specified, otherwise fall back to input.path
+    let watchPaths: string[];
+    if (this.config.watch?.paths) {
+      watchPaths = this.config.watch.paths;
+    } else if (this.config.input?.path) {
+      // Use input.path as the default watch path
+      watchPaths = [this.config.input.path];
+    } else {
+      // Final fallback to 'src' if neither is specified
+      watchPaths = ['src'];
+    }
+    
     const ignored = this.config.watch?.ignored || ['**/node_modules/**', '**/\.*'];
 
     logger.info(`Starting file watcher for paths: ${watchPaths.join(', ')}`);

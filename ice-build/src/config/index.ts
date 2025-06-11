@@ -98,6 +98,8 @@ export class ConfigManager {
         // Create glob patterns from input path
         this.config.input.ts = [`${inputPath}/**/*.ts`, `${inputPath}/**/*.tsx`];
         this.config.input.scss = [`${inputPath}/**/*.scss`, `${inputPath}/**/*.sass`];
+        // Preserve the input.path for use by FileWatcher
+        (this.config.input as any).path = inputPath;
         logger.debug(`Set input paths from ${inputPath}: ts=[${this.config.input.ts}], scss=[${this.config.input.scss}]`);
       }
       
