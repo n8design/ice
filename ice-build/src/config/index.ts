@@ -90,6 +90,9 @@ export class ConfigManager {
   
   // Apply config with simple merging
   public applyConfig(userConfig: any): void {
+    logger.debug(`applyConfig called with userConfig: ${JSON.stringify(userConfig, null, 2)}`);
+    logger.debug(`Before applying config, current HTML patterns: ${JSON.stringify(this.config.input.html)}`);
+    
     // Ensure proper structure
     if (userConfig.input) {
       // Handle input paths
@@ -98,9 +101,11 @@ export class ConfigManager {
         // Create glob patterns from input path
         this.config.input.ts = [`${inputPath}/**/*.ts`, `${inputPath}/**/*.tsx`];
         this.config.input.scss = [`${inputPath}/**/*.scss`, `${inputPath}/**/*.sass`];
+        this.config.input.html = [`${inputPath}/**/*.html`];
+        logger.debug(`HTML patterns set from input.path: ${JSON.stringify(this.config.input.html)}`);
         // Preserve the input.path for use by FileWatcher
         (this.config.input as any).path = inputPath;
-        logger.debug(`Set input paths from ${inputPath}: ts=[${this.config.input.ts}], scss=[${this.config.input.scss}]`);
+        logger.debug(`Set input paths from ${inputPath}: ts=[${this.config.input.ts}], scss=[${this.config.input.scss}], html=[${this.config.input.html}]`);
       }
       
       // Still allow specific overrides
@@ -112,6 +117,14 @@ export class ConfigManager {
       if (Array.isArray(userConfig.input.scss)) {
         this.config.input.scss = userConfig.input.scss;
         logger.debug(`Overrode SCSS input paths with: [${this.config.input.scss.join(', ')}]`);
+      }
+      
+      logger.debug(`Checking HTML patterns - userConfig.input.html: ${JSON.stringify(userConfig.input.html)}, isArray: ${Array.isArray(userConfig.input.html)}`);
+      if (Array.isArray(userConfig.input.html)) {
+        this.config.input.html = userConfig.input.html;
+        logger.debug(`Overrode HTML input paths with: [${this.config.input.html?.join(', ')}]`);
+      } else {
+        logger.debug(`HTML patterns not overridden - userConfig.input.html is not an array`);
       }
     }
     
@@ -150,6 +163,15 @@ export class ConfigManager {
       logger.debug(`Applied SCSS/Sass options. Current this.config.scss: ${JSON.stringify(this.config.scss, null, 2)}`);
     } else {
       logger.debug('No user SCSS/Sass options found. Using defaults or existing this.config.scss.');
+    }
+    
+    // Set hotreload options
+    if (userConfig.hotreload) {
+      logger.debug(`User hotreload options found: ${JSON.stringify(userConfig.hotreload, null, 2)}`);
+      this.config.hotreload = { ...userConfig.hotreload };
+      logger.debug(`Applied hotreload options: ${JSON.stringify(this.config.hotreload, null, 2)}`);
+    } else {
+      logger.debug('No user hotreload options found.');
     }
     
     logger.debug(`Final applied config: ${JSON.stringify(this.config, null, 2)}`);

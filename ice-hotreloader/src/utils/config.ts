@@ -9,6 +9,11 @@ export interface HotReloaderOptions {
   port?: number;
   
   /**
+   * Host to use for WebSocket connection
+   */
+  host?: string;
+  
+  /**
    * Output directory to strip from file paths
    */
   outputDir?: string;
@@ -31,6 +36,7 @@ export interface HotReloaderOptions {
  */
 export const defaultOptions: Required<HotReloaderOptions> = {
   port: 3001,
+  host: 'localhost',
   outputDir: 'public',
   refreshAllStylesheetsOnNoMatch: true,
   debug: false

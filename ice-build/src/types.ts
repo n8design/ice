@@ -52,6 +52,7 @@ export interface IceConfig {
     host?: string;
     debounceTime?: number;
     excludeExtensions?: string[];
+    serveFromNodeModules?: boolean;
   };
   esbuild?: BuildOptions;
   postcss?: {

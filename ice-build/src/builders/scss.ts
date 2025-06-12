@@ -939,7 +939,9 @@ export class SCSSBuilder extends EventEmitter implements Builder {
       logger.debug(`SCSS getAllScssFiles: Checking input.scss glob patterns...`);
       const globPatterns = inputConfig.scss;
       for (const pattern of globPatterns) {
-        const absolutePattern = path.isAbsolute(pattern) ? pattern : path.resolve(baseInputPath, pattern);
+        // Resolve patterns relative to the project root, not baseInputPath
+        // because the patterns in input.scss already include the source directory
+        const absolutePattern = path.isAbsolute(pattern) ? pattern : path.resolve(process.cwd(), pattern);
         try {
           const matches = await glob(absolutePattern, { nodir: true });
           logger.debug(`  Glob pattern '${absolutePattern}' found ${matches.length} files.`);

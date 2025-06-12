@@ -141,9 +141,32 @@ export class HTMLBuilder implements Builder {
     const port = this.config.hotreload?.port || 3001;
     const host = this.config.hotreload?.host || 'localhost';
     
-    const hotReloadScript = `
+    // Support both serving methods:
+    // 1. Serve from node_modules (traditional method): /ice-hotreloader/dist/browser.min.js
+    // 2. Serve from hot reload server (new method): http://localhost:3002/ice-hotreload.js
+    const serveFromNodeModules = this.config.hotreload?.serveFromNodeModules ?? true;
+    
+    let hotReloadScript: string;
+    
+    if (serveFromNodeModules) {
+      // Traditional method: serve from node_modules with global config
+      hotReloadScript = `
     <!-- Ice-Build Hot Reload -->
+    <script>
+      // Configure hot reload connection
+      window.ICE_HOTRELOAD_CONFIG = { port: ${port}, host: '${host}' };
+    </script>
+    <script src="/ice-hotreloader/dist/browser.min.js"></script>`;
+    } else {
+      // Alternative method: serve from hot reload server directly
+      hotReloadScript = `
+    <!-- Ice-Build Hot Reload -->
+    <script>
+      // Configure hot reload connection
+      window.ICE_HOTRELOAD_CONFIG = { port: ${port}, host: '${host}' };
+    </script>
     <script src="http://${host}:${port}/ice-hotreload.js"></script>`;
+    }
     
     // Try to inject before </head>
     const headIndex = content.indexOf('</head>');

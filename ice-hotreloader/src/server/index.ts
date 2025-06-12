@@ -4,6 +4,8 @@ import { normalizePath, removeOutputDirPrefix } from '../utils/path-utils.js';
 import { HotReloaderOptions, mergeWithDefaults } from '../utils/config.js';
 import path from 'path';
 import chalk from 'chalk';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 // Helper function for getting the current time
 function getCurrentTime(): string {
@@ -34,7 +36,39 @@ export class HotReloadServer {
         
         this.options = mergeWithDefaults(options);
         
-        const server = createServer();
+        const server = createServer((req, res) => {
+            // Log all HTTP requests
+            console.log(`🔥 [${getCurrentTime()}] HTTP Request: ${req.method} ${req.url} from ${req.headers.host}`);
+            
+            // Handle requests for the hot reload script
+            if (req.url === '/ice-hotreload.js') {
+                try {
+                    // Get the current file directory
+                    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+                    // Path to the browser script (go up to dist, then to browser.min.js)
+                    const browserScriptPath = path.join(__dirname, '..', 'browser.min.js');
+                    
+                    if (fs.existsSync(browserScriptPath)) {
+                        const script = fs.readFileSync(browserScriptPath, 'utf-8');
+                        res.writeHead(200, {
+                            'Content-Type': 'application/javascript',
+                            'Cache-Control': 'no-cache'
+                        });
+                        res.end(script);
+                    } else {
+                        res.writeHead(404, { 'Content-Type': 'text/plain' });
+                        res.end('Hot reload script not found');
+                    }
+                } catch (error) {
+                    console.error(`🔥 [${getCurrentTime()}] Error serving hot reload script:`, error);
+                    res.writeHead(500, { 'Content-Type': 'text/plain' });
+                    res.end('Internal server error');
+                }
+            } else {
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end('Not found');
+            }
+        });
         this.wss = new WebSocketServer({ server });
         
         this.wss.on('connection', (ws) => {

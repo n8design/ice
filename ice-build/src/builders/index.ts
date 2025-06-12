@@ -32,13 +32,8 @@ const createFallbackHTMLBuilder = (config: IceConfig, outputPath: string): HTMLB
   };
 };
 
-// Load the actual HTMLBuilder if available
+// Load the actual HTMLBuilder if available - will be loaded dynamically in constructor
 let htmlBuilderModule: { HTMLBuilder?: any } = {};
-try {
-  htmlBuilderModule = require('./html.js');
-} catch (e) {
-  logger.warn('HTML builder module not found, will use fallback');
-}
 
 export class Builder extends EventEmitter {
   private config: IceConfig;
@@ -48,6 +43,8 @@ export class Builder extends EventEmitter {
   private htmlBuilder: HTMLBuilderInterface;
   private outputWatcher: OutputWatcher | null = null;
   private hotReloadServer: any = null; // Add reference to the hotReloader
+  private htmlBuilderInitialized: boolean = false;
+  private htmlBuilderInitializing: Promise<void> | null = null;
 
   constructor(config: IceConfig) {
     super(); // Call EventEmitter constructor
@@ -66,18 +63,9 @@ export class Builder extends EventEmitter {
     this.tsBuilder = new TypeScriptBuilder(config, this.outputPath);
     this.scssBuilder = new SCSSBuilder(config, this.outputPath);
     
-    // Try to initialize HTML builder safely
-    try {
-      if (htmlBuilderModule.HTMLBuilder) {
-        this.htmlBuilder = new htmlBuilderModule.HTMLBuilder(config, this.outputPath);
-      } else {
-        this.htmlBuilder = createFallbackHTMLBuilder(config, this.outputPath);
-      }
-    } catch (e) {
-      logger.warn(`Failed to initialize HTML builder: ${e instanceof Error ? e.message : String(e)}`);
-      // Use the fallback builder
-      this.htmlBuilder = createFallbackHTMLBuilder(config, this.outputPath);
-    }
+    // Initialize HTML builder with fallback, then try to load the real one
+    this.htmlBuilder = createFallbackHTMLBuilder(config, this.outputPath);
+    this.htmlBuilderInitializing = this.initializeHtmlBuilder(config, this.outputPath);
     
     // Initialize output watcher if enabled in config
     if (config.watchOutput !== false) {
@@ -89,6 +77,31 @@ export class Builder extends EventEmitter {
       // We'll initialize the output watcher later when we have the hot reload server
       // Move this code to the setHotReloadServer method
       this.outputWatcher = null;
+    }
+  }
+
+  /**
+   * Initialize HTML builder with dynamic import
+   */
+  private async initializeHtmlBuilder(config: IceConfig, outputPath: string): Promise<void> {
+    try {
+      const { HTMLBuilder } = await import('./html.js');
+      this.htmlBuilder = new HTMLBuilder(config, outputPath);
+      this.htmlBuilderInitialized = true;
+      logger.info('HTML builder loaded successfully');
+    } catch (e) {
+      logger.warn(`Failed to load HTML builder: ${e instanceof Error ? e.message : String(e)}`);
+      // Keep the fallback builder that was already assigned
+      this.htmlBuilderInitialized = false;
+    }
+  }
+
+  /**
+   * Ensure HTML builder is fully initialized
+   */
+  private async ensureHtmlBuilderInitialized(): Promise<void> {
+    if (this.htmlBuilderInitializing) {
+      await this.htmlBuilderInitializing;
     }
   }
 
@@ -117,6 +130,9 @@ export class Builder extends EventEmitter {
   public async buildAll(): Promise<void> {
     logger.info('Starting full build');
     const startTime = Date.now();
+    
+    // Make sure HTML builder is fully initialized before building
+    await this.ensureHtmlBuilderInitialized();
     
     // Build TypeScript, SCSS, and HTML in parallel
     await Promise.all([
