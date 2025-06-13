@@ -178,12 +178,13 @@ export class Builder extends EventEmitter {
 
   /**
    * Get the appropriate builder for a file based on extension
+   * Only return the SCSS builder for .scss/.sass files, never for others
    * @param filePath File path
    * @returns The appropriate builder or null if none found
    */
   public getBuilderForFile(filePath: string): SCSSBuilder | TypeScriptBuilder | HTMLBuilderInterface | null {
     const ext = path.extname(filePath).toLowerCase();
-    
+
     if (ext === '.ts' || ext === '.tsx') {
       return this.tsBuilder;
     } else if (ext === '.scss' || ext === '.sass') {
@@ -191,7 +192,7 @@ export class Builder extends EventEmitter {
     } else if (ext === '.html') {
       return this.htmlBuilder;
     }
-    
+    // Never return the SCSS builder for non-scss files
     return null;
   }
 

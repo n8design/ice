@@ -111,7 +111,7 @@ export class FileWatcher {
     try {
       const builder = this.builder.getBuilderForFile(filePath);
       if (!builder) {
-        logger.warn(`No builder found for file: ${filePath}`);
+        logger.info(`No builder found for file: ${filePath} (ignored)`);
         return;
       }
       
