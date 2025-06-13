@@ -108,20 +108,14 @@ export class Builder extends EventEmitter {
   // Add method to set the hot reload server
   public setHotReloadServer(server: any): void {
     this.hotReloadServer = server;
-    
-    // Now that we have the hot reload server, create the output watcher
-    if (this.hotReloadServer) {
-      // Get output directory
-      const outputDir = typeof this.config.output === 'string' 
-        ? this.config.output 
-        : (this.config.output && 'path' in this.config.output ? this.config.output.path : 'public');
-        
-      // Create output watcher with all three arguments (including config)
-      this.outputWatcher = new OutputWatcher(outputDir, this.hotReloadServer, this.config);
-      
-      // Start the watcher
-      this.outputWatcher.start();
-    }
+    this.scssBuilder.setHotReloadServer(server);
+    this.tsBuilder.setHotReloadServer(server);
+    // OutputWatcher temporarily disabled for next release
+    // const outputDir = typeof this.config.output === 'string' 
+    //   ? this.config.output 
+    //   : (this.config.output && 'path' in this.config.output ? this.config.output.path : 'public');
+    // this.outputWatcher = new OutputWatcher(outputDir, this.hotReloadServer, this.config);
+    // this.outputWatcher.start();
   }
 
   /**
