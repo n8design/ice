@@ -95,4 +95,5 @@ export interface Builder {
   buildFile(filePath: string): Promise<void>;
   clean?(): Promise<void>;
   processChange(filePath: string): Promise<void>;
+  setHotReloadServer?(server: any): void;
 }

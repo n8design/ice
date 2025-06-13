@@ -62,10 +62,22 @@ export class Builder extends EventEmitter {
     // Initialize builders
     this.tsBuilder = new TypeScriptBuilder(config, this.outputPath);
     this.scssBuilder = new SCSSBuilder(config, this.outputPath);
-    
     // Initialize HTML builder with fallback, then try to load the real one
     this.htmlBuilder = createFallbackHTMLBuilder(config, this.outputPath);
     this.htmlBuilderInitializing = this.initializeHtmlBuilder(config, this.outputPath);
+    // If the real HTMLBuilder is loaded, set the SCSS and TS builder references
+    if (typeof (this.htmlBuilder as any).setScssBuilder === 'function') {
+      logger.info('Setting SCSS builder on HTMLBuilder in constructor');
+      (this.htmlBuilder as any).setScssBuilder(this.scssBuilder);
+    } else {
+      logger.warn('setScssBuilder method not found on HTMLBuilder in constructor');
+    }
+    if (typeof (this.htmlBuilder as any).setTsBuilder === 'function') {
+      logger.info('Setting TS builder on HTMLBuilder in constructor');
+      (this.htmlBuilder as any).setTsBuilder(this.tsBuilder);
+    } else {
+      logger.warn('setTsBuilder method not found on HTMLBuilder in constructor');
+    }
     
     // Initialize output watcher if enabled in config
     if (config.watchOutput !== false) {
@@ -87,11 +99,27 @@ export class Builder extends EventEmitter {
     try {
       const { HTMLBuilder } = await import('./html.js');
       this.htmlBuilder = new HTMLBuilder(config, outputPath);
+      // Set the SCSS and TS builder references for Pattern Lab integration
+      if (typeof (this.htmlBuilder as any).setScssBuilder === 'function') {
+        logger.info('Setting SCSS builder on HTMLBuilder after dynamic import');
+        (this.htmlBuilder as any).setScssBuilder(this.scssBuilder);
+      } else {
+        logger.warn('setScssBuilder method not found on HTMLBuilder after dynamic import');
+      }
+      if (typeof (this.htmlBuilder as any).setTsBuilder === 'function') {
+        logger.info('Setting TS builder on HTMLBuilder after dynamic import');
+        (this.htmlBuilder as any).setTsBuilder(this.tsBuilder);
+      } else {
+        logger.warn('setTsBuilder method not found on HTMLBuilder after dynamic import');
+      }
+      // Also update the OutputWatcher if it exists
+      if (this.outputWatcher && typeof (this.outputWatcher as any).setHtmlBuilder === 'function') {
+        (this.outputWatcher as any).setHtmlBuilder(this.htmlBuilder);
+      }
       this.htmlBuilderInitialized = true;
       logger.info('HTML builder loaded successfully');
     } catch (e) {
       logger.warn(`Failed to load HTML builder: ${e instanceof Error ? e.message : String(e)}`);
-      // Keep the fallback builder that was already assigned
       this.htmlBuilderInitialized = false;
     }
   }
@@ -110,12 +138,24 @@ export class Builder extends EventEmitter {
     this.hotReloadServer = server;
     this.scssBuilder.setHotReloadServer(server);
     this.tsBuilder.setHotReloadServer(server);
-    // OutputWatcher temporarily disabled for next release
-    // const outputDir = typeof this.config.output === 'string' 
-    //   ? this.config.output 
-    //   : (this.config.output && 'path' in this.config.output ? this.config.output.path : 'public');
-    // this.outputWatcher = new OutputWatcher(outputDir, this.hotReloadServer, this.config);
-    // this.outputWatcher.start();
+    // Re-enable OutputWatcher for HTML file changes only (Pattern Lab requirement)
+    const outputDir = typeof this.config.output === 'string' 
+      ? this.config.output 
+      : (this.config.output && 'path' in this.config.output ? this.config.output.path : 'public');
+    this.outputWatcher = new OutputWatcher(outputDir, this.hotReloadServer, {
+      ...this.config,
+      hotreload: {
+        ...this.config.hotreload,
+        // Only exclude CSS/JS/map files since builders handle those directly
+        // HTML files are NOT excluded so Pattern Lab can trigger CSS/JS rebuilds
+        excludeExtensions: ['.css', '.js', '.map']
+      }
+    });
+    // Set the HTMLBuilder on the OutputWatcher so it can trigger CSS/JS rebuilds
+    if (typeof (this.outputWatcher as any).setHtmlBuilder === 'function') {
+      (this.outputWatcher as any).setHtmlBuilder(this.htmlBuilder);
+    }
+    this.outputWatcher.start();
   }
 
   /**
@@ -183,7 +223,7 @@ export class Builder extends EventEmitter {
       return this.tsBuilder;
     } else if (ext === '.scss' || ext === '.sass') {
       return this.scssBuilder;
-    } else if (ext === '.html') {
+    } else if (ext === '.html' || ext === '.hbs' || ext === '.handlebars') {
       return this.htmlBuilder;
     }
     // Never return the SCSS builder for non-scss files

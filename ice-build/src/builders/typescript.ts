@@ -10,10 +10,15 @@ const logger = new Logger('TypeScript');
 export class TypeScriptBuilder implements Builder {
   private config: IceConfig;
   private outputPath: string;
+  private hotReloadServer: any = null;
 
   constructor(config: IceConfig, outputPath: string) {
     this.config = config;
     this.outputPath = outputPath;
+  }
+
+  public setHotReloadServer(server: any) {
+    this.hotReloadServer = server;
   }
 
   async build(): Promise<void> {
@@ -215,35 +220,27 @@ export class TypeScriptBuilder implements Builder {
 
   async buildFile(filePath: string): Promise<void> {
     logger.info(`Building TypeScript file: ${filePath}`);
-    
     try {
       const startTime = Date.now();
-      
-      // Configure plugins for SCSS handling in TS  
       const plugins = await this.configurePlugins();
-      
-      // Determine the correct output path
       const outputPath = this.getOutputPath(filePath);
       logger.info(`Output will be written to: ${outputPath}`);
-      
-      // Create the build options
       const buildOptions: esbuild.BuildOptions = {
         entryPoints: [filePath],
         outdir: path.dirname(outputPath),
-        outfile: outputPath, // This will be overridden for directory structures
+        outfile: outputPath,
         format: 'esm',
         ...this.config.esbuild,
         tsconfig: await this.findTsConfig(),
         plugins,
       };
-      
-      // Apply our path transformation
       const transformedOptions = this.transformOutputPath(buildOptions);
-      
       await esbuild.build(transformedOptions);
-      
       const endTime = Date.now();
       logger.success(`TypeScript file built in ${endTime - startTime}ms`);
+      if (this.hotReloadServer) {
+        this.hotReloadServer.notifyClients('js', outputPath);
+      }
     } catch (error: any) {
       logger.error(`TypeScript file build failed: ${error.message}`);
       throw error;

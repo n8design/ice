@@ -31,6 +31,10 @@ interface SassDependency {
  * Handles compilation of SCSS files and dependency tracking
  */
 export class SCSSBuilder extends EventEmitter implements Builder {
+  public hotReloadServer: any = null;
+  public setHotReloadServer(server: any) {
+    this.hotReloadServer = server;
+  }
   public readonly config: IceConfig;
   private dependencyGraph: Map<string, SassDependency>;
   private outputDir: string;
@@ -1357,6 +1361,9 @@ export class SCSSBuilder extends EventEmitter implements Builder {
 
           logger.success(`Built CSS: ${path.relative(process.cwd(), outputCssPath)}`);
           this.emit('fileProcessed', outputCssPath);
+          if (this.hotReloadServer) {
+            this.hotReloadServer.notifyClients('css', outputCssPath);
+          }
         }
       } catch (error: any) {
         logger.error(`Failed to compile/process ${path.basename(filePath)}: ${error.message}`);

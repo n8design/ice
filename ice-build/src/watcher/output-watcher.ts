@@ -36,6 +36,8 @@ export class OutputWatcher {
   private batchTimer: NodeJS.Timeout | null = null;
   private batchDelay: number = 150; // ms to wait before sending batched updates
 
+  private htmlBuilder: any = null;
+
   /**
    * Create a new output folder watcher
    * @param outputDir The output directory to watch
@@ -224,22 +226,42 @@ export class OutputWatcher {
     // At this point, we've passed all the exclusion checks,
     // so the file should trigger a hot reload
     
-    // FINAL SAFETY: Block all HTML files regardless of configuration
-    // This ensures HTML files NEVER trigger hot reloads
-    if (['.html', '.htm', '.hbs'].includes(ext)) {
-      this.logger.debug(`🛑 ABSOLUTE BLOCK: HTML files are completely disabled for hot reload: ${fileName}`);
-      return;
-    }
-    
-    // Handle different file types (HTML files are blocked above)
+    // Handle different file types
     if (ext === '.css') {
       this.logger.info(`Detected CSS change in output: ${fileName}`);
       this.batchFileChange('css', filePath);
     } else if (ext === '.js') {
       this.logger.info(`Detected JS change in output: ${fileName}`);
       this.batchFileChange('full', filePath);
+    } else if (['.html', '.htm', '.hbs'].includes(ext)) {
+      // Check if HTML files are excluded by configuration
+      const excludeExtensions = this.config?.hotreload?.excludeExtensions || [];
+      const isHtmlExcluded = Array.isArray(excludeExtensions) && 
+                            excludeExtensions.some((e: any) => 
+                              typeof e === 'string' && 
+                              e.toLowerCase() === ext.toLowerCase());
+      
+      if (isHtmlExcluded) {
+        // HTML files are explicitly excluded by configuration
+        this.logger.debug(`🛑 ABSOLUTE BLOCK: HTML files are completely disabled for hot reload: ${fileName}`);
+        return;
+      } else if (!Array.isArray(excludeExtensions) || excludeExtensions.length === 0) {
+        // No excludeExtensions configuration - default to blocking HTML files
+        this.logger.debug(`🛑 ABSOLUTE BLOCK: HTML files are completely disabled for hot reload: ${fileName}`);
+        return;
+      } else {
+        // HTML files are not excluded - check if this is index.html
+        if (fileName.toLowerCase() === 'index.html') {
+          // Only trigger CSS/JS rebuilds when index.html changes (Pattern Lab completion indicator)
+          this.logger.info(`Detected index.html change in output: ${fileName} - triggering CSS/JS rebuild`);
+          this.handleHtmlChange(filePath);
+        } else {
+          // Other HTML files don't trigger rebuilds to avoid multiple rapid triggers
+          this.logger.debug(`Detected HTML change in output: ${fileName} - ignoring (only index.html triggers rebuilds)`);
+        }
+      }
     } else {
-      // For any other file type (HTML files are already blocked above)
+      // For any other file type
       this.logger.info(`Detected change in output: ${fileName}`);
       this.batchFileChange('full', filePath);
     }
@@ -435,5 +457,21 @@ export class OutputWatcher {
     }
     
     return false;
+  }
+
+  public setHtmlBuilder(builder: any) {
+    this.htmlBuilder = builder;
+  }
+
+  /**
+   * Handle HTML file changes by triggering CSS/JS rebuilds
+   * @param filePath Path to the changed HTML file
+   */
+  private handleHtmlChange(filePath: string): void {
+    if (this.htmlBuilder && typeof this.htmlBuilder.processChange === 'function') {
+      this.htmlBuilder.processChange(filePath);
+    } else {
+      this.logger.warn('HTMLBuilder not available for HTML change processing');
+    }
   }
 }

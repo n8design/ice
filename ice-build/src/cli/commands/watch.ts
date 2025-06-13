@@ -111,11 +111,16 @@ export function registerWatchCommand(program: Command): void {
               outputDir
             });
             
+            // Set the hot reload server on the build manager so builders can notify directly
+            if (hotReloadServer) {
+              buildManager.setHotReloadServer(hotReloadServer);
+            }
+            
             // Create and start the output watcher
-            const { OutputWatcher } = await import('../../watcher/output-watcher.js');
-            // Pass the entire config object to OutputWatcher
-            const outputWatcher = new OutputWatcher(outputDir, hotReloadServer, config);
-            outputWatcher.start();
+            // OutputWatcher is temporarily disabled for this release
+            // const { OutputWatcher } = await import('../../watcher/output-watcher.js');
+            // const outputWatcher = new OutputWatcher(outputDir, hotReloadServer, config);
+            // outputWatcher.start();
             
             logger.success('Hot reload server started');
             logger.info('📝 To enable hot reloading in the browser:');

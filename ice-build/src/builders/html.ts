@@ -16,6 +16,8 @@ export class HTMLBuilder implements Builder {
   private config: IceConfig;
   private outputDir: string;
   private hotReloadEnabled: boolean;
+  private scssBuilder: any = null;
+  private tsBuilder: any = null;
 
   constructor(config: IceConfig, outputDir?: string) {
     this.config = config;
@@ -130,7 +132,27 @@ export class HTMLBuilder implements Builder {
    * Process a file change
    */
   public async processChange(filePath: string): Promise<void> {
-    return this.buildFile(filePath);
+    logger.info(`HTML processChange triggered for: ${filePath}`);
+    await this.buildFile(filePath);
+    
+    // Log debug info about builder availability
+    logger.info(`SCSS builder available: ${!!this.scssBuilder}`);
+    logger.info(`TS builder available: ${!!this.tsBuilder}`);
+    
+    // Trigger immediate CSS and JS builds (no debounce needed since only index.html triggers this)
+    if (this.scssBuilder && typeof this.scssBuilder.build === 'function') {
+      logger.info('Triggering SCSS rebuild after HTML change');
+      await this.scssBuilder.build();
+    } else {
+      logger.warn('SCSS builder not available or build method not found');
+    }
+    
+    if (this.tsBuilder && typeof this.tsBuilder.build === 'function') {
+      logger.info('Triggering TypeScript rebuild after HTML change');
+      await this.tsBuilder.build();
+    } else {
+      logger.warn('TypeScript builder not available or build method not found');
+    }
   }
 
   /**
@@ -183,5 +205,15 @@ export class HTMLBuilder implements Builder {
     // If neither tag found, just append to the end
     logger.warn('Could not find </head> or </body> in HTML file, appending hot reload script to the end');
     return content + hotReloadScript;
+  }
+
+  public setScssBuilder(builder: any) {
+    logger.info('setScssBuilder called on HTMLBuilder');
+    this.scssBuilder = builder;
+  }
+
+  public setTsBuilder(builder: any) {
+    logger.info('setTsBuilder called on HTMLBuilder');
+    this.tsBuilder = builder;
   }
 }
