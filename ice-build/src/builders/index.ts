@@ -136,26 +136,36 @@ export class Builder extends EventEmitter {
   // Add method to set the hot reload server
   public setHotReloadServer(server: any): void {
     this.hotReloadServer = server;
-    this.scssBuilder.setHotReloadServer(server);
-    this.tsBuilder.setHotReloadServer(server);
-    // Re-enable OutputWatcher for HTML file changes only (Pattern Lab requirement)
-    const outputDir = typeof this.config.output === 'string' 
-      ? this.config.output 
-      : (this.config.output && 'path' in this.config.output ? this.config.output.path : 'public');
-    this.outputWatcher = new OutputWatcher(outputDir, this.hotReloadServer, {
-      ...this.config,
-      hotreload: {
-        ...this.config.hotreload,
-        // Only exclude CSS/JS/map files since builders handle those directly
-        // HTML files are NOT excluded so Pattern Lab can trigger CSS/JS rebuilds
-        excludeExtensions: ['.css', '.js', '.map']
-      }
-    });
-    // Set the HTMLBuilder on the OutputWatcher so it can trigger CSS/JS rebuilds
-    if (typeof (this.outputWatcher as any).setHtmlBuilder === 'function') {
-      (this.outputWatcher as any).setHtmlBuilder(this.htmlBuilder);
+    
+    // Set hot reload server on SCSS builder
+    if (typeof (this.scssBuilder as any).setHotReloadServer === 'function') {
+      (this.scssBuilder as any).setHotReloadServer(server);
     }
-    this.outputWatcher.start();
+    
+    // Set hot reload server on TypeScript builder  
+    if (typeof (this.tsBuilder as any).setHotReloadServer === 'function') {
+      (this.tsBuilder as any).setHotReloadServer(server);
+    }
+    
+    // HTML watcher disabled for now
+    // const outputDir = typeof this.config.output === 'string' 
+    //   ? this.config.output 
+    //   : (this.config.output && 'path' in this.config.output ? this.config.output.path : 'public');
+    // this.outputWatcher = new OutputWatcher(outputDir, this.hotReloadServer, {
+    //   ...this.config,
+    //   hotreload: {
+    //     ...this.config.hotreload,
+    //     // Only exclude CSS/JS/map files since builders handle those directly
+    //     // HTML files are NOT excluded so Pattern Lab can trigger CSS/JS rebuilds
+    //     excludeExtensions: ['.css', '.js', '.map']
+    //   }
+    // });
+    // // Set the HTMLBuilder on the OutputWatcher so it can trigger CSS/JS rebuilds
+    // if (typeof (this.outputWatcher as any).setHtmlBuilder === 'function') {
+    //   (this.outputWatcher as any).setHtmlBuilder(this.htmlBuilder);
+    // }
+    // this.outputWatcher.start();
+    this.outputWatcher = null;
   }
 
   /**
@@ -223,7 +233,7 @@ export class Builder extends EventEmitter {
       return this.tsBuilder;
     } else if (ext === '.scss' || ext === '.sass') {
       return this.scssBuilder;
-    } else if (ext === '.html' || ext === '.hbs' || ext === '.handlebars') {
+    } else if (ext === '.html') {
       return this.htmlBuilder;
     }
     // Never return the SCSS builder for non-scss files

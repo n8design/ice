@@ -1041,7 +1041,15 @@ export class SCSSBuilder extends EventEmitter implements Builder {
           await this.processScssFile(filePath);
         }
       } catch (error) {
-        logger.error(`Error processing SCSS change: ${error instanceof Error ? error.message : error}`);
+        // Convert escaped ANSI codes back to actual ANSI sequences for proper color display
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const formattedMessage = errorMessage
+          .replace(/\\x1B\[(\d+)m/g, '\x1B[$1m')  // Convert \x1B[Nm to actual ANSI codes
+          .replace(/\\n/g, '\n')                   // Convert literal \n to actual newlines
+          .replace(/\\'/g, "'")                    // Convert escaped quotes
+          .replace(/\\"/g, '"');                   // Convert escaped double quotes
+          
+        logger.error(`Error processing SCSS change: ${formattedMessage}`);
       }
     }
   }
@@ -1366,8 +1374,15 @@ export class SCSSBuilder extends EventEmitter implements Builder {
           }
         }
       } catch (error: any) {
-        logger.error(`Failed to compile/process ${path.basename(filePath)}: ${error.message}`);
-        this.emit('error', `Compilation failed for ${filePath}: ${error.message}`);
+        // Convert escaped ANSI codes back to actual ANSI sequences for proper color display
+        const formattedMessage = error.message
+          .replace(/\\x1B\[(\d+)m/g, '\x1B[$1m')  // Convert \x1B[Nm to actual ANSI codes
+          .replace(/\\n/g, '\n')                   // Convert literal \n to actual newlines
+          .replace(/\\'/g, "'")                    // Convert escaped quotes
+          .replace(/\\"/g, '"');                   // Convert escaped double quotes
+          
+        logger.error(`Failed to compile/process ${path.basename(filePath)}: ${formattedMessage}`);
+        this.emit('error', `Compilation failed for ${filePath}: ${formattedMessage}`);
         try {
           if (!fs.existsSync(outputCssDir)) fs.mkdirSync(outputCssDir, { recursive: true });
           // Corrected the replace call for the fallback CSS
@@ -1377,8 +1392,15 @@ export class SCSSBuilder extends EventEmitter implements Builder {
         }
       }
     } catch (error: any) {
-      logger.error(`Error processing SCSS file ${filePath}: ${error.message}`);
-      this.emit('error', `Error processing SCSS file ${filePath}: ${error.message}`);
+      // Convert escaped ANSI codes back to actual ANSI sequences for proper color display
+      const formattedMessage = error.message
+        .replace(/\\x1B\[(\d+)m/g, '\x1B[$1m')  // Convert \x1B[Nm to actual ANSI codes
+        .replace(/\\n/g, '\n')                   // Convert literal \n to actual newlines
+        .replace(/\\'/g, "'")                    // Convert escaped quotes
+        .replace(/\\"/g, '"');                   // Convert escaped double quotes
+        
+      logger.error(`Error processing SCSS file ${filePath}: ${formattedMessage}`);
+      this.emit('error', `Error processing SCSS file ${filePath}: ${formattedMessage}`);
     }
   }
 

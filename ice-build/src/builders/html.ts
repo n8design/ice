@@ -1,157 +1,73 @@
 import { Builder } from '../types.js';
 import { IceConfig } from '../types.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import { promises as fsPromises } from 'fs';
-import { glob } from 'glob';
 import { Logger } from '../utils/logger.js';
 
 const logger = new Logger('HTML');
 
 /**
  * HTML Builder class
- * Handles processing HTML files and injecting hot reload support
+ * Handles watching HTML changes and triggering CSS/JS rebuilds (Pattern Lab handles actual HTML building)
  */
 export class HTMLBuilder implements Builder {
   private config: IceConfig;
-  private outputDir: string;
-  private hotReloadEnabled: boolean;
   private scssBuilder: any = null;
   private tsBuilder: any = null;
+  private isProcessing: boolean = false;
 
   constructor(config: IceConfig, outputDir?: string) {
     this.config = config;
-    
-    // Determine output directory
-    if (outputDir) {
-      this.outputDir = outputDir;
-    } else if (typeof this.config.output === 'string') {
-      this.outputDir = this.config.output;
-    } else if (this.config.output && typeof this.config.output === 'object' && 'path' in this.config.output) {
-      this.outputDir = this.config.output.path;
-    } else {
-      this.outputDir = 'public';
-    }
-    
-    // Create output directory if it doesn't exist
-    if (!fs.existsSync(this.outputDir)) {
-      try {
-        fs.mkdirSync(this.outputDir, { recursive: true });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(`Failed to create output directory: ${errorMessage}`);
-      }
-    }
-    
-    // Check if hot reload is enabled
-    this.hotReloadEnabled = Boolean(this.config.hotreload?.enabled);
+    logger.info('HTML Builder initialized (watch-only mode for Pattern Lab integration)');
   }
 
   /**
-   * Build all HTML files
+   * Build all HTML files - No-op since Pattern Lab handles HTML building
    */
   public async build(): Promise<void> {
-    logger.info('Building HTML files');
-    
-    try {
-      // Get HTML file patterns from config
-      const patterns = this.config.input.html || [];
-      
-      if (patterns.length === 0) {
-        logger.info('No HTML patterns defined in config, skipping HTML processing');
-        return;
-      }
-      
-      const htmlFiles = [];
-      for (const pattern of patterns) {
-        try {
-          const files = await glob(pattern);
-          htmlFiles.push(...files);
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          logger.error(`Failed to find HTML files with pattern ${pattern}: ${errorMessage}`);
-        }
-      }
-      
-      if (htmlFiles.length === 0) {
-        logger.info('No HTML files found');
-        return;
-      }
-      
-      logger.info(`Found ${htmlFiles.length} HTML files to process`);
-      
-      // Process each HTML file
-      for (const file of htmlFiles) {
-        await this.buildFile(file);
-      }
-      
-      logger.success('HTML build complete');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`HTML build failed: ${errorMessage}`);
-    }
+    logger.info('HTML build skipped - Pattern Lab handles HTML building');
   }
 
   /**
-   * Build a single HTML file
+   * Build a single HTML file - No-op since Pattern Lab handles HTML building
    */
   public async buildFile(filePath: string): Promise<void> {
-    try {
-      logger.info(`Processing HTML file: ${filePath}`);
-      
-      // Read HTML file
-      const content = await fsPromises.readFile(filePath, 'utf-8');
-      
-      // Determine output path
-      const relativePath = path.relative(process.cwd(), filePath);
-      const outputPath = path.join(this.outputDir, relativePath);
-      const outputDir = path.dirname(outputPath);
-      
-      // Create output directory if it doesn't exist
-      await fsPromises.mkdir(outputDir, { recursive: true });
-      
-      // Process HTML content
-      let processedContent = content;
-      
-      // Inject hot reload script if enabled
-      if (this.hotReloadEnabled) {
-        processedContent = this.injectHotReloadScript(processedContent);
-      }
-      
-      // Write processed content to output file
-      await fsPromises.writeFile(outputPath, processedContent, 'utf-8');
-      
-      logger.success(`HTML file processed: ${outputPath}`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Failed to process HTML file ${filePath}: ${errorMessage}`);
-    }
+    logger.info(`HTML buildFile skipped for: ${filePath} - Pattern Lab handles HTML building`);
   }
 
   /**
-   * Process a file change
+   * Process a file change - Only trigger CSS/JS rebuilds
    */
   public async processChange(filePath: string): Promise<void> {
-    logger.info(`HTML processChange triggered for: ${filePath}`);
-    await this.buildFile(filePath);
-    
-    // Log debug info about builder availability
-    logger.info(`SCSS builder available: ${!!this.scssBuilder}`);
-    logger.info(`TS builder available: ${!!this.tsBuilder}`);
-    
-    // Trigger immediate CSS and JS builds (no debounce needed since only index.html triggers this)
-    if (this.scssBuilder && typeof this.scssBuilder.build === 'function') {
-      logger.info('Triggering SCSS rebuild after HTML change');
-      await this.scssBuilder.build();
-    } else {
-      logger.warn('SCSS builder not available or build method not found');
+    // Prevent recursion
+    if (this.isProcessing) {
+      logger.warn(`HTML processChange already in progress, ignoring: ${filePath}`);
+      return;
     }
     
-    if (this.tsBuilder && typeof this.tsBuilder.build === 'function') {
-      logger.info('Triggering TypeScript rebuild after HTML change');
-      await this.tsBuilder.build();
-    } else {
-      logger.warn('TypeScript builder not available or build method not found');
+    this.isProcessing = true;
+    
+    try {
+      logger.info(`HTML change detected: ${filePath} - triggering CSS/JS rebuilds`);
+      
+      // Log debug info about builder availability
+      logger.info(`SCSS builder available: ${!!this.scssBuilder}`);
+      logger.info(`TS builder available: ${!!this.tsBuilder}`);
+      
+      // Trigger immediate CSS and JS builds
+      if (this.scssBuilder && typeof this.scssBuilder.build === 'function') {
+        logger.info('Triggering SCSS rebuild after HTML change');
+        await this.scssBuilder.build();
+      } else {
+        logger.warn('SCSS builder not available or build method not found');
+      }
+      
+      if (this.tsBuilder && typeof this.tsBuilder.build === 'function') {
+        logger.info('Triggering TypeScript rebuild after HTML change');
+        await this.tsBuilder.build();
+      } else {
+        logger.warn('TypeScript builder not available or build method not found');
+      }
+    } finally {
+      this.isProcessing = false;
     }
   }
 
