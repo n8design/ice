@@ -19,6 +19,85 @@ import autoprefixer from 'autoprefixer';
 const logger = new Logger('scss');
 
 /**
+ * Extract the best error message from a Sass compilation error
+ * Uses the original formatted error message when available
+ */
+function getSassErrorMessage(error: any): string {
+  if (!error) return 'Unknown error';
+  
+  // For Sass compilation errors, use the formatted message if available
+  if (error && typeof error === 'object') {
+    // First check for direct Sass errors with formatted toString
+    if (error.toString && typeof error.toString === 'function') {
+      const stringified = error.toString();
+      // If toString gives us a nice formatted message (not just error type), use it
+      if (stringified && 
+          stringified !== '[object Object]' && 
+          stringified !== error.constructor.name &&
+          !stringified.startsWith('Error [ERR_UNHANDLED_ERROR]')) {
+        return stringified;
+      }
+    }
+    
+    // Sass provides a nicely formatted error message in the 'formatted' property
+    if (error.formatted && typeof error.formatted === 'string') {
+      return error.formatted;
+    }
+    
+    // Check for sassMessage property
+    if (error.sassMessage && typeof error.sassMessage === 'string') {
+      return error.sassMessage;
+    }
+    
+    // Check for span property which often contains line/column info
+    if (error.span && error.message && typeof error.message === 'string') {
+      return error.message;
+    }      // For nested errors, try to extract the inner message
+      if (error.message && typeof error.message === 'string') {
+        const message = error.message;
+        
+        // Extract message from patterns like: Error [ERR_UNHANDLED_ERROR]: Unhandled error. ("actual message")
+        const unhandledMatch = message.match(/Unhandled error\.\s*\(["'`]([^"'`]+)["'`]\)/);
+        if (unhandledMatch) {
+          return unhandledMatch[1];
+        }
+        
+        // Extract from patterns like: Compilation failed for filename: actual message
+        const compilationMatch = message.match(/Compilation failed for [^:]+:\s*(.+)/);
+        if (compilationMatch) {
+          return compilationMatch[1];
+        }
+        
+        // Extract from patterns like: Error processing SCSS file filename: actual message
+        const processingMatch = message.match(/Error processing SCSS file [^:]+:\s*(.+)/);
+        if (processingMatch) {
+          // Recursively clean the extracted message
+          return getSassErrorMessage({ message: processingMatch[1] });
+        }
+        
+        // Extract from patterns with escaped newlines like: Can't find stylesheet to import.\n" +
+        const escapedNewlineMatch = message.match(/^([^\\]+)\\n"\s*\+/);
+        if (escapedNewlineMatch) {
+          return escapedNewlineMatch[1];
+        }
+        
+        // If it's not a nested error message, return as-is (avoid [object Object])
+        if (message !== '[object Object]') {
+          return message;
+        }
+      }
+  }
+  
+  // Fallback to standard error message
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  
+  // Last resort
+  return String(error);
+}
+
+/**
  * Represents a dependency relationship between SCSS files
  */
 interface SassDependency {
@@ -113,7 +192,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
       }
       logger.info('SCSS build complete');
     } catch (error) {
-      logger.error(`Error during SCSS build: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(`Error during SCSS build: ${getSassErrorMessage(error)}`);
     }
   }
 
@@ -163,13 +242,13 @@ export class SCSSBuilder extends EventEmitter implements Builder {
               if (error.code === 'ENOENT') {
                   logger.warn(`File not found during deletion: ${file}`);
               } else {
-                  logger.error(`Failed to delete file ${file}: ${error instanceof Error ? error.message : error}`);
+                  logger.error(`Failed to delete file ${file}: ${getSassErrorMessage(error)}`);
               }
           }
       } 
       logger.success(`Cleaned ${deletedCount} CSS/map files.`);
     } catch (error) {
-      logger.error(`Error during CSS clean process: ${error instanceof Error ? error.message : error}`);
+      logger.error(`Error during CSS clean process: ${getSassErrorMessage(error)}`);
     }
   }
 
@@ -235,7 +314,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
             }
           }
         } catch (error) {
-          logger.error(`Error processing ${file}: ${error instanceof Error ? error.message : String(error)}`);
+          logger.error(`Error processing ${file}: ${getSassErrorMessage(error)}`);
         }
       }
 
@@ -257,8 +336,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
       logger.success(`Dependency graph built with ${this.dependencyGraph.size} nodes`);
       return this.dependencyGraph
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Error building dependency graph: ${errorMessage}`);
+      logger.error(`Error building dependency graph: ${getSassErrorMessage(error)}`);
       return new Map(); // Return empty graph on failure
     }
   }
@@ -951,8 +1029,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
           logger.debug(`  Glob pattern '${absolutePattern}' found ${matches.length} files.`);
           matches.forEach(match => files.add(path.resolve(match)));
         } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          logger.error(`  Error finding files for pattern ${absolutePattern}: ${errorMessage}`);
+          logger.error(`  Error finding files for pattern ${absolutePattern}: ${getSassErrorMessage(error)}`);
         }
       }
     }
@@ -968,8 +1045,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
         logger.debug(`  Fallback glob '${globPattern}' found ${nonPartialMatches.length} non-partial files.`);
         nonPartialMatches.forEach(match => files.add(path.resolve(match)));
       } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(`  Error during fallback glob in ${baseInputPath}: ${errorMessage}`);
+        logger.error(`  Error during fallback glob in ${baseInputPath}: ${getSassErrorMessage(error)}`);
       }
     }
 
@@ -1041,15 +1117,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
           await this.processScssFile(filePath);
         }
       } catch (error) {
-        // Convert escaped ANSI codes back to actual ANSI sequences for proper color display
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const formattedMessage = errorMessage
-          .replace(/\\x1B\[(\d+)m/g, '\x1B[$1m')  // Convert \x1B[Nm to actual ANSI codes
-          .replace(/\\n/g, '\n')                   // Convert literal \n to actual newlines
-          .replace(/\\'/g, "'")                    // Convert escaped quotes
-          .replace(/\\"/g, '"');                   // Convert escaped double quotes
-          
-        logger.error(`Error processing SCSS change: ${formattedMessage}`);
+        logger.error(`Error processing SCSS change: ${getSassErrorMessage(error)}`);
       }
     }
   }
@@ -1254,7 +1322,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
           logger.info(`Attempting to build partial directly: ${partialPath}`);
           await this.processScssFile(partialPath);
         } catch (directBuildError) {
-          logger.error(`Failed to build partial directly: ${directBuildError instanceof Error ? directBuildError.message : String(directBuildError)}`);
+          logger.error(`Failed to build partial directly: ${getSassErrorMessage(directBuildError)}`);
         }
         return;
       }
@@ -1265,7 +1333,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
         await this.processScssFile(parentFile);
       }
     } catch (error) {
-      logger.error(`Error processing partial ${partialPath}: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(`Error processing partial ${partialPath}: ${getSassErrorMessage(error)}`);
     }
   }
 
@@ -1374,33 +1442,21 @@ export class SCSSBuilder extends EventEmitter implements Builder {
           }
         }
       } catch (error: any) {
-        // Convert escaped ANSI codes back to actual ANSI sequences for proper color display
-        const formattedMessage = error.message
-          .replace(/\\x1B\[(\d+)m/g, '\x1B[$1m')  // Convert \x1B[Nm to actual ANSI codes
-          .replace(/\\n/g, '\n')                   // Convert literal \n to actual newlines
-          .replace(/\\'/g, "'")                    // Convert escaped quotes
-          .replace(/\\"/g, '"');                   // Convert escaped double quotes
-          
-        logger.error(`Failed to compile/process ${path.basename(filePath)}: ${formattedMessage}`);
-        this.emit('error', `Compilation failed for ${filePath}: ${formattedMessage}`);
+        const cleanedMessage = getSassErrorMessage(error);
+        logger.error(`Failed to compile/process ${path.basename(filePath)}: ${cleanedMessage}`);
+        this.emit('error', `Compilation failed for ${filePath}: ${cleanedMessage}`);
         try {
           if (!fs.existsSync(outputCssDir)) fs.mkdirSync(outputCssDir, { recursive: true });
-          // Corrected the replace call for the fallback CSS
-          await fsPromises.writeFile(outputCssPath, `/* Error compiling ${path.basename(filePath)}: ${error.message.replace(/\*\//g, '* / ')} */`);
+          // Use the cleaned message for the CSS comment too, but escape CSS comment end sequences
+          await fsPromises.writeFile(outputCssPath, `/* Error compiling ${path.basename(filePath)}: ${cleanedMessage.replace(/\*\//g, '* / ')} */`);
         } catch (fallbackError: any) {
-          logger.error(`Failed to write error fallback CSS for ${filePath}: ${fallbackError.message}`);
+          logger.error(`Failed to write error fallback CSS for ${filePath}: ${getSassErrorMessage(fallbackError)}`);
         }
       }
     } catch (error: any) {
-      // Convert escaped ANSI codes back to actual ANSI sequences for proper color display
-      const formattedMessage = error.message
-        .replace(/\\x1B\[(\d+)m/g, '\x1B[$1m')  // Convert \x1B[Nm to actual ANSI codes
-        .replace(/\\n/g, '\n')                   // Convert literal \n to actual newlines
-        .replace(/\\'/g, "'")                    // Convert escaped quotes
-        .replace(/\\"/g, '"');                   // Convert escaped double quotes
-        
-      logger.error(`Error processing SCSS file ${filePath}: ${formattedMessage}`);
-      this.emit('error', `Error processing SCSS file ${filePath}: ${formattedMessage}`);
+      const cleanedMessage = getSassErrorMessage(error);
+      logger.error(`Error processing SCSS file ${filePath}: ${cleanedMessage}`);
+      this.emit('error', `Error processing SCSS file ${filePath}: ${cleanedMessage}`);
     }
   }
 
@@ -1506,7 +1562,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
       
       return match;
     } catch (error) {
-      logger.error(`Error checking forwards in ${indexPath}: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(`Error checking forwards in ${indexPath}: ${getSassErrorMessage(error)}`);
       return false;
     }
   }
