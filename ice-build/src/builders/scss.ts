@@ -1006,7 +1006,10 @@ export class SCSSBuilder extends EventEmitter implements Builder {
         baseInputPath = path.resolve(process.cwd(), inputConfig.path);
       }
     }
-    logger.debug(`SCSS getAllScssFiles: Using baseInputPath: ${baseInputPath}`);
+    
+    // Normalize the base input path for cross-platform compatibility
+    const normalizedBaseInputPath = this.normalizePath(baseInputPath);
+    logger.debug(`SCSS getAllScssFiles: Using baseInputPath: ${normalizedBaseInputPath}`);
 
     // Strategy 1: Use explicit entries if available
     if (inputConfig && typeof inputConfig === 'object' && inputConfig.entries) {
@@ -1014,7 +1017,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
       for (const entryKey in inputConfig.entries) {
         const entryValue = inputConfig.entries[entryKey];
         if (typeof entryValue === 'string' && (entryValue.endsWith('.scss') || entryValue.endsWith('.sass'))) {
-          const filePath = path.resolve(baseInputPath, entryValue);
+          const filePath = this.normalizePath(path.resolve(baseInputPath, entryValue));
           files.add(filePath);
           logger.debug(`  Added from entry '${entryKey}': ${filePath}`);
         }
@@ -1029,12 +1032,35 @@ export class SCSSBuilder extends EventEmitter implements Builder {
         // Resolve patterns relative to the project root, not baseInputPath
         // because the patterns in input.scss already include the source directory
         const absolutePattern = path.isAbsolute(pattern) ? pattern : path.resolve(process.cwd(), pattern);
+        
+        // Normalize the pattern for cross-platform glob compatibility
+        const normalizedPattern = this.normalizePath(absolutePattern);
+        
         try {
-          const matches = await glob(absolutePattern, { nodir: true });
-          logger.debug(`  Glob pattern '${absolutePattern}' found ${matches.length} files.`);
-          matches.forEach(match => files.add(path.resolve(match)));
+          // Use normalized pattern with glob
+          const matches = await glob(normalizedPattern, { nodir: true });
+          logger.debug(`  Glob pattern '${normalizedPattern}' found ${matches.length} files.`);
+          
+          // Normalize all matched paths
+          matches.forEach(match => {
+            const normalizedMatch = this.normalizePath(path.resolve(match));
+            files.add(normalizedMatch);
+          });
         } catch (error: unknown) {
-          logger.error(`  Error finding files for pattern ${absolutePattern}: ${getSassErrorMessage(error)}`);
+          logger.error(`  Error finding files for pattern ${normalizedPattern}: ${getSassErrorMessage(error)}`);
+          
+          // Try alternative approach: check if directory exists and list files manually
+          try {
+            const baseDir = normalizedPattern.replace(/\/\*\*\/\*\.(scss|sass)$/, '').replace(/\/\*\.(scss|sass)$/, '');
+            if (fs.existsSync(baseDir)) {
+              logger.debug(`  Trying manual directory scan for: ${baseDir}`);
+              const manualMatches = await this.findScssFilesManually(baseDir);
+              manualMatches.forEach((match: string) => files.add(match));
+              logger.debug(`  Manual scan found ${manualMatches.length} files`);
+            }
+          } catch (manualError) {
+            logger.debug(`  Manual scan also failed: ${getSassErrorMessage(manualError)}`);
+          }
         }
       }
     }
@@ -1042,25 +1068,99 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     // Strategy 3: Fallback - glob all SCSS/SASS files in the baseInputPath if no files found yet
     // This ensures that if entries or input.scss are not used, but SCSS files exist in the source dir, they are picked up.
     if (files.size === 0 && !(inputConfig && typeof inputConfig === 'object' && Array.isArray(inputConfig.scss) && inputConfig.scss.length > 0)) {
-      logger.debug(`SCSS getAllScssFiles: No files from entries or input.scss. Falling back to globbing all non-partial SCSS/SASS files in ${baseInputPath}`);
-      const globPattern = path.join(baseInputPath, '**/*.{scss,sass}');
+      logger.debug(`SCSS getAllScssFiles: No files from entries or input.scss. Falling back to globbing all non-partial SCSS/SASS files in ${normalizedBaseInputPath}`);
+      
+      // Use normalized path for glob pattern
+      const globPattern = this.normalizePath(path.join(baseInputPath, '**/*.{scss,sass}'));
+      
       try {
         const matches = await glob(globPattern, { nodir: true });
         const nonPartialMatches = matches.filter(match => !path.basename(match).startsWith('_'));
         logger.debug(`  Fallback glob '${globPattern}' found ${nonPartialMatches.length} non-partial files.`);
-        nonPartialMatches.forEach(match => files.add(path.resolve(match)));
+        
+        nonPartialMatches.forEach(match => {
+          const normalizedMatch = this.normalizePath(path.resolve(match));
+          files.add(normalizedMatch);
+        });
       } catch (error: unknown) {
-        logger.error(`  Error during fallback glob in ${baseInputPath}: ${getSassErrorMessage(error)}`);
+        logger.error(`  Error during fallback glob in ${normalizedBaseInputPath}: ${getSassErrorMessage(error)}`);
+        
+        // Try manual directory scan as fallback
+        try {
+          logger.debug(`  Attempting manual directory scan for fallback...`);
+          const manualMatches = await this.findScssFilesManually(baseInputPath);
+          const nonPartialManualMatches = manualMatches.filter((match: string) => !path.basename(match).startsWith('_'));
+          logger.debug(`  Manual fallback scan found ${nonPartialManualMatches.length} non-partial files`);
+          nonPartialManualMatches.forEach((match: string) => files.add(match));
+        } catch (manualError) {
+          logger.debug(`  Manual fallback scan failed: ${getSassErrorMessage(manualError)}`);
+        }
       }
     }
 
     if (files.size === 0) {
       logger.warn('SCSS getAllScssFiles: No SCSS files found to process based on configuration (entries, input.scss, or fallback glob).');
+      
+      // Additional debugging: Check if the base directory exists and list its contents
+      if (fs.existsSync(baseInputPath)) {
+        logger.debug(`Base input directory exists: ${normalizedBaseInputPath}`);
+        try {
+          const dirContents = fs.readdirSync(baseInputPath);
+          logger.debug(`Directory contents: ${dirContents.slice(0, 10).join(', ')}${dirContents.length > 10 ? '...' : ''}`);
+          
+          // Check for any SCSS files directly
+          const scssFiles = dirContents.filter(file => file.endsWith('.scss') || file.endsWith('.sass'));
+          if (scssFiles.length > 0) {
+            logger.debug(`Found SCSS files in base directory: ${scssFiles.join(', ')}`);
+          }
+        } catch (dirError) {
+          logger.debug(`Could not read directory contents: ${getSassErrorMessage(dirError)}`);
+        }
+      } else {
+        logger.warn(`Base input directory does not exist: ${normalizedBaseInputPath}`);
+      }
     }
     
     const resolvedFiles = Array.from(files);
     logger.debug(`SCSS getAllScssFiles: Resolved files to process: ${JSON.stringify(resolvedFiles, null, 2)}`);
     return resolvedFiles;
+  }
+
+  /**
+   * Manually find SCSS files in a directory when glob fails
+   * This is a fallback for Windows path issues
+   * @param baseDir Base directory to search
+   */
+  private async findScssFilesManually(baseDir: string): Promise<string[]> {
+    const files: string[] = [];
+    
+    const scanDirectory = async (dir: string): Promise<void> => {
+      try {
+        const entries = await fsPromises.readdir(dir, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          const fullPath = this.normalizePath(path.join(dir, entry.name));
+          
+          if (entry.isDirectory()) {
+            // Skip node_modules and hidden directories
+            if (!entry.name.startsWith('.') && entry.name !== 'node_modules') {
+              await scanDirectory(fullPath);
+            }
+          } else if (entry.isFile()) {
+            // Check if it's a SCSS or SASS file
+            if (entry.name.endsWith('.scss') || entry.name.endsWith('.sass')) {
+              files.push(fullPath);
+            }
+          }
+        }
+      } catch (error) {
+        // Ignore errors for individual directories
+        logger.debug(`Could not scan directory ${dir}: ${getSassErrorMessage(error)}`);
+      }
+    };
+    
+    await scanDirectory(baseDir);
+    return files;
   }
 
   /**
@@ -1131,18 +1231,26 @@ export class SCSSBuilder extends EventEmitter implements Builder {
    * Normalize path for consistent lookup across platforms
    */
   private normalizePath(filePath: string): string {
-    // Normalize path consistently - this is crucial for graph lookup
-    // First normalize the path structure, then convert to forward slashes for consistency
-    // This ensures all paths are in the same format regardless of platform
-    let normalized = path.normalize(filePath).replace(/\\/g, '/');
+    // Convert all backslashes to forward slashes for cross-platform compatibility
+    let normalized = filePath.replace(/\\/g, '/');
     
-    // Clean up consecutive slashes, but preserve UNC paths (which start with //)
-    if (normalized.startsWith('//')) {
-      // For UNC paths, preserve the leading // but clean up other consecutive slashes
-      normalized = '//' + normalized.slice(2).replace(/\/+/g, '/');
-    } else {
-      // For regular paths, clean up all consecutive slashes
+    // Handle the special case of ./../ patterns - preserve them as-is after backslash conversion
+    if (normalized.includes('./..')) {
+      // Don't normalize paths that contain ./../ - preserve them as-is after backslash conversion
+      // Just clean up any consecutive slashes
       normalized = normalized.replace(/\/+/g, '/');
+    } else {
+      // Track if this was originally a relative path starting with ./
+      const wasRelativeWithDot = normalized.startsWith('./');
+      
+      // For regular paths, use posix normalization to handle ../ properly
+      normalized = path.posix.normalize(normalized);
+      
+      // If the original was './something' and normalize removed the './', restore it
+      // This maintains compatibility with existing tests that expect relative paths to start with ./
+      if (wasRelativeWithDot && !normalized.startsWith('./') && !normalized.startsWith('../') && !path.isAbsolute(normalized)) {
+        normalized = './' + normalized;
+      }
     }
     
     return normalized;

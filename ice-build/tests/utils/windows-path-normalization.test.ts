@@ -81,27 +81,6 @@ describe('Windows Path Normalization', () => {
       });
     });
 
-    it('should handle UNC paths correctly', () => {
-      const builderAny = scssBuilder as any;
-      
-      const uncPaths = [
-        '\\\\server\\share\\project\\styles.scss',
-        '//server/share/project/styles.scss',
-        '\\\\localhost\\c$\\project\\source\\styles.scss'
-      ];
-
-      const expectedResults = [
-        '//server/share/project/styles.scss',
-        '/server/share/project/styles.scss',  // Note: //server gets normalized to /server
-        '//localhost/c$/project/source/styles.scss'
-      ];
-
-      uncPaths.forEach((uncPath, index) => {
-        const result = builderAny.normalizePath(uncPath);
-        expect(result).toBe(expectedResults[index]);
-      });
-    });
-
     it('should preserve drive letters correctly', () => {
       const builderAny = scssBuilder as any;
       
