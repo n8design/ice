@@ -1134,7 +1134,18 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     // Normalize path consistently - this is crucial for graph lookup
     // First normalize the path structure, then convert to forward slashes for consistency
     // This ensures all paths are in the same format regardless of platform
-    return path.normalize(filePath).replace(/\\/g, '/');
+    let normalized = path.normalize(filePath).replace(/\\/g, '/');
+    
+    // Clean up consecutive slashes, but preserve UNC paths (which start with //)
+    if (normalized.startsWith('//')) {
+      // For UNC paths, preserve the leading // but clean up other consecutive slashes
+      normalized = '//' + normalized.slice(2).replace(/\/+/g, '/');
+    } else {
+      // For regular paths, clean up all consecutive slashes
+      normalized = normalized.replace(/\/+/g, '/');
+    }
+    
+    return normalized;
   }
 
   /**
