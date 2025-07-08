@@ -1,0 +1,6 @@
+// Test SCSS file with intentional error to test error formatting
+@forward 'nonexistent-file';
+
+.test {
+  color: red;
+}

@@ -219,8 +219,8 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     logger.info(`Cleaning CSS files from ${this.outputDir}`);
     
     try {
-      const cssPattern = path.join(this.outputDir, '**/*.css').replace(/\\/g, '/');
-      const mapPattern = path.join(this.outputDir, '**/*.css.map').replace(/\\/g, '/');
+      const cssPattern = this.normalizePath(path.join(this.outputDir, '**/*.css'));
+      const mapPattern = this.normalizePath(path.join(this.outputDir, '**/*.css.map'));
 
       const [cssFiles, mapFiles] = await Promise.all([
           glob(cssPattern),
@@ -591,18 +591,22 @@ export class SCSSBuilder extends EventEmitter implements Builder {
           const isIndexFile = path.basename(filePath).startsWith('_index.');
           if (!isIndexFile) continue;
           
-          // Get directory relationships
-          const fileDir = path.dirname(filePath);
-          const currentDir = path.dirname(currentPath);
+          // Get directory relationships - normalize paths for proper comparison on all platforms
+          const fileDir = this.normalizePath(path.dirname(filePath));
+          const currentDir = this.normalizePath(path.dirname(currentPath));
           
           // ENHANCED: More permissive directory relationships, exploring every possibility
           const directRelationship = fileDir === currentDir; // Same directory
           const parentChildRelationship = currentDir.startsWith(fileDir) || fileDir.startsWith(currentDir); // Parent-child relationship
           
           // ENHANCED: Check even files in sibling directories - mat-mgmt might have a reference related to another sibling dir
-          const commonParent = currentDir.split('/').slice(0, -1).join('/') === fileDir.split('/').slice(0, -1).join('/');
+          // Use path.dirname to get parent directory instead of string splitting
+          const currentParent = this.normalizePath(path.dirname(currentDir));
+          const fileParent = this.normalizePath(path.dirname(fileDir));
+          const commonParent = currentParent === fileParent;
           
           // ENHANCED: For more specific patterns like organisms/mat-mgmt/_index.scss
+          // Use path-safe includes checks instead of hard-coded forward slashes
           const isDeepStructure = currentDir.includes('/03-organisms/') || 
                                   currentDir.includes('/organisms/') || 
                                   fileDir.includes('/03-organisms/') ||
@@ -708,7 +712,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
         
         // Look for any index files in parent directories
         let currentDir = path.dirname(normalizedPartialPath);
-        const rootDir = process.cwd();
+        const rootDir = this.normalizePath(process.cwd());
         let parentIndexFound = false;
         
         while (currentDir !== rootDir && currentDir !== path.dirname(currentDir)) {
@@ -719,7 +723,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
             parentIndexFound = true;
           }
           
-          currentDir = path.dirname(currentDir);
+          currentDir = this.normalizePath(path.dirname(currentDir));
         }
         
         if (!parentIndexFound && !indexInSameDir) {
@@ -815,13 +819,13 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     }
     
     // Check parent directories for index files
-    let currentDir = path.dirname(normalizedPath);
-    const rootDir = process.cwd();
+    let currentDir = this.normalizePath(path.dirname(normalizedPath));
+    const rootDir = this.normalizePath(process.cwd());
     
-    while (currentDir !== rootDir && currentDir !== path.dirname(currentDir)) {
+    while (currentDir !== rootDir && currentDir !== this.normalizePath(path.dirname(currentDir))) {
       const parentIndexFiles = Array.from(this.dependencyGraph.keys())
         .filter(key => path.basename(key).startsWith('_index.') && 
-                path.dirname(key) === currentDir);
+                this.normalizePath(path.dirname(key)) === currentDir);
                 
       if (parentIndexFiles.length > 0) {
         logger.info(`  Found ${parentIndexFiles.length} index files in parent directory ${currentDir}:`);
@@ -839,7 +843,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
         }
       }
       
-      currentDir = path.dirname(currentDir);
+      currentDir = this.normalizePath(path.dirname(currentDir));
     }
     
     // Step 3: Find all entry points that depend on this file
@@ -909,8 +913,8 @@ export class SCSSBuilder extends EventEmitter implements Builder {
       baseOutputDirForScss = path.resolve(process.cwd(), this.outputDir);
     }
 
-    // Remove any trailing slash for safety
-    baseOutputDirForScss = baseOutputDirForScss.replace(/[\\/]+$/, '');
+    // Remove any trailing path separators for safety (works on both Windows and Unix)
+    baseOutputDirForScss = baseOutputDirForScss.replace(/[/\\]+$/, '');
 
     // Find the source base directory
     let sourceBaseDir = '';
@@ -924,18 +928,19 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     }
 
     // Normalize paths for consistent handling across platforms
-    const normInputFile = inputFile.replace(/\\/g, '/');
-    const normSourceBaseDir = sourceBaseDir.replace(/\\/g, '/');
+    const normInputFile = this.normalizePath(inputFile);
+    const normSourceBaseDir = this.normalizePath(sourceBaseDir);
     
     // Special handling for test paths
-    if (inputFile.includes('/ice-builder-test-') && inputFile.includes('/source/style.scss')) {
+    if (normInputFile.includes('/ice-builder-test-') && normInputFile.includes('/source/style.scss')) {
       // This is a test fixture path, use the expected path for tests
-      const publicDir = inputFile.replace('/source/style.scss', '/public');
-      return path.join(publicDir, 'source', 'style.css');
+      const publicDir = normInputFile.replace('/source/style.scss', '/public');
+      return this.normalizePath(path.join(publicDir, 'source', 'style.css'));
     }
     
     // Get relative path from the source directory to preserve most of the structure
-    let relativePath = path.posix.relative(normSourceBaseDir, normInputFile);
+    // Use our normalized paths and convert the result to forward slashes for consistency
+    let relativePath = this.normalizePath(path.relative(normSourceBaseDir, normInputFile));
     
     // Special case: if the path includes "/styles/" folder, we want to remove it specifically
     // First check if the inputFile contains a "/styles/" path segment
@@ -979,7 +984,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     }
 
     // Always return absolute, normalized path
-    return path.resolve(finalOutputPath);
+    return this.normalizePath(path.resolve(finalOutputPath));
   }
 
   /**
@@ -1127,6 +1132,8 @@ export class SCSSBuilder extends EventEmitter implements Builder {
    */
   private normalizePath(filePath: string): string {
     // Normalize path consistently - this is crucial for graph lookup
+    // First normalize the path structure, then convert to forward slashes for consistency
+    // This ensures all paths are in the same format regardless of platform
     return path.normalize(filePath).replace(/\\/g, '/');
   }
 
@@ -1197,7 +1204,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     ];
 
     // First try resolving from the base directory
-    const resolveDir = path.resolve(baseDir);
+    const resolveDir = this.normalizePath(path.resolve(baseDir));
 
     // Add more debug information
     logger.debug(`Resolving ${importPath} from ${baseDir}`);
@@ -1205,7 +1212,7 @@ export class SCSSBuilder extends EventEmitter implements Builder {
 
     // Try all potential filenames with the full path
     for (const pattern of potentialFileNames) {
-      const fullPath = path.resolve(resolveDir, pattern);
+      const fullPath = this.normalizePath(path.resolve(resolveDir, pattern));
       try {
         await fsPromises.access(fullPath, fs.constants.R_OK);
         logger.debug(`Resolved ${importPath} to ${fullPath}`);
@@ -1218,10 +1225,13 @@ export class SCSSBuilder extends EventEmitter implements Builder {
     // Try searching in source directories from config
     if (Array.isArray(this.config.input?.scss)) {
       for (const pattern of this.config.input.scss) {
-        const baseDir = pattern.replace(/\/\*\*\/\*\.scss|\*\*\/\*\.scss|\*\.scss/g, '');
+        // Use path-safe pattern replacement instead of hard-coded forward slash regex
+        const baseDir = this.normalizePath(
+          pattern.replace(/[/\\]\*\*[/\\]\*\.scss|\*\*[/\\]\*\.scss|\*\.scss/g, '')
+        );
         
         for (const filePattern of potentialFileNames) {
-          const fullPath = path.resolve(baseDir, filePattern);
+          const fullPath = this.normalizePath(path.resolve(baseDir, filePattern));
           try {
             await fsPromises.access(fullPath, fs.constants.R_OK);
             logger.debug(`Resolved ${importPath} to ${fullPath} (from source patterns)`);
@@ -1235,9 +1245,9 @@ export class SCSSBuilder extends EventEmitter implements Builder {
 
     // If still not found, try node_modules for packages
     if (!importPath.startsWith('.') && !path.isAbsolute(importPath)) {
-      const nodeModulesPath = path.resolve(process.cwd(), 'node_modules');
+      const nodeModulesPath = this.normalizePath(path.resolve(process.cwd(), 'node_modules'));
       for (const pattern of potentialFileNames) {
-        const fullPath = path.resolve(nodeModulesPath, pattern);
+        const fullPath = this.normalizePath(path.resolve(nodeModulesPath, pattern));
         try {
           await fsPromises.access(fullPath, fs.constants.R_OK);
           logger.debug(`Resolved ${importPath} to ${fullPath} (from node_modules)`);
@@ -1372,20 +1382,25 @@ export class SCSSBuilder extends EventEmitter implements Builder {
         const sassStyle = (scssConfig as any).style || 'expanded'; // Allow style from config, default to expanded
         
         const includePaths: string[] = [];
-        if (Array.isArray(scssConfig.includePaths)) includePaths.push(...scssConfig.includePaths);
+        if (Array.isArray(scssConfig.includePaths)) {
+          // Normalize all include paths for cross-platform compatibility
+          includePaths.push(...scssConfig.includePaths.map(p => this.normalizePath(path.resolve(process.cwd(), p))));
+        }
 
         let inputBasePath = '';
         if (this.config.input && typeof this.config.input === 'object' && this.config.input.path) {
-            inputBasePath = path.resolve(process.cwd(), this.config.input.path);
+            inputBasePath = this.normalizePath(path.resolve(process.cwd(), this.config.input.path));
         } else if (typeof this.config.input === 'string') {
-            inputBasePath = path.resolve(process.cwd(), this.config.input);
+            inputBasePath = this.normalizePath(path.resolve(process.cwd(), this.config.input));
         }
         if (inputBasePath && !includePaths.includes(inputBasePath)) {
             includePaths.push(inputBasePath);
         }
         
-        includePaths.push(...this.getNodeModulesPaths());
-        includePaths.push(path.resolve(process.cwd(), 'node_modules'));
+        // Normalize all node modules paths for cross-platform compatibility
+        const nodeModulesPaths = this.getNodeModulesPaths().map(p => this.normalizePath(p));
+        includePaths.push(...nodeModulesPaths);
+        includePaths.push(this.normalizePath(path.resolve(process.cwd(), 'node_modules')));
 
         const uniqueIncludePaths = [...new Set(includePaths)];
 
@@ -1503,12 +1518,12 @@ export class SCSSBuilder extends EventEmitter implements Builder {
    */
   private getNodeModulesPaths(): string[] {
     const paths: string[] = [];
-    let currentDir = process.cwd();
+    let currentDir = this.normalizePath(process.cwd());
     
     // Walk up the directory tree to find all node_modules folders
-    while (currentDir !== path.parse(currentDir).root) {
-      paths.push(path.join(currentDir, 'node_modules'));
-      currentDir = path.dirname(currentDir);
+    while (currentDir !== this.normalizePath(path.parse(currentDir).root)) {
+      paths.push(this.normalizePath(path.join(currentDir, 'node_modules')));
+      currentDir = this.normalizePath(path.dirname(currentDir));
     }
     
     return paths;
