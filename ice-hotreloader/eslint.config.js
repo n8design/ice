@@ -42,5 +42,15 @@ export default tseslint.config(
       // Add specific overrides for browser code if needed
       // "no-console": "warn", // Example: Warn console in browser
     },
+  },
+
+  // Configuration for test files
+  {
+    files: ["**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "no-console": "off"
+    }
   }
 );

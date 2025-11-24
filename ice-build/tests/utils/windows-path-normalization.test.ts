@@ -287,10 +287,11 @@ describe('Windows Path Normalization', () => {
           
           // Should be a string
           expect(typeof outputPath).toBe('string');
-        } catch (error) {
+        } catch (error: unknown) {
           // Some tests might fail due to missing directories or config issues
           // That's OK for this test - we're just verifying path normalization
-          console.log('getOutputPath test skipped due to:', error.message);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.log('getOutputPath test skipped due to:', errorMessage);
           expect(true).toBe(true); // Mark test as passed
         }
       });

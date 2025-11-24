@@ -51,14 +51,14 @@
     "url": "https://github.com/n8design/ice.git"
   },
   "dependencies": {
-    "vitest": "^3.1.2",
-    "ws": "^8.x"
+    "vitest": "^3.2.4",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@types/node": "^22.x",
-    "@types/ws": "^8.x",
-    "esbuild": "^0.25.x",
-    "typescript": "^5.x"
+    "@types/node": "^22.19.1",
+    "@types/ws": "^8.5.14",
+    "esbuild": "^0.27.0",
+    "typescript": "^5.9.3"
   },
   "nx-release-publish": {
     "executor": "@nx/js:release-publish",

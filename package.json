@@ -28,12 +28,10 @@
     "build": "nx run-many --target=build --all",
     "build:ice-build": "nx build ice-build",
     "build:ice-hotreloader": "nx build ice-hotreloader",
-
     "// Lint operations": "",
     "lint": "nx run-many --target=lint --all",
     "lint:ice-build": "nx lint ice-build",
     "lint:ice-hotreloader": "nx lint ice-hotreloader",
-
     "// Test operations": "",
     "pretest:release": "node scripts/tests/mkdir.cjs",
     "test": "nx run-many --target=test --all",
@@ -41,29 +39,23 @@
     "test:ice-hotreloader": "nx test ice-hotreloader",
     "test:release": "cross-env NODE_ENV=test vitest run",
     "test:release:safety": "./test-release-process.sh",
-
     "// Release operations": "",
     "version": "node scripts/update-version.cjs",
     "release:check": "npm run test:release:safety",
     "release:checklist": "bash -c 'echo \"📋 Release Checklist:\\n✅ Make sure you are on main branch\\n✅ git pull\\n✅ git status should be clean\\n✅ npm test\\n✅ Run: npm run release:alpha:ice-build OR npm run release:stable:ice-build -- patch\"'",
-
     "// CI release operations": "",
     "ci:release": "npm run test && npm run release:check",
     "ci:release:ice-build": "npm run test:ice-build",
     "ci:release:ice-hotreloader": "npm run test:ice-hotreloader",
-
     "// Alpha releases": "",
     "release:alpha:ice-build": "npm run ci:release:ice-build && nx release version --projects=ice-build --specifier=prerelease --preid=alpha && npm run version && node scripts/finalize-release.cjs ice-build",
     "release:alpha:ice-hotreloader": "npm run ci:release:ice-hotreloader && nx release version --projects=ice-hotreloader --specifier=prerelease --preid=alpha && npm run version && node scripts/finalize-release.cjs ice-hotreloader",
-
     "// Stable releases": "",
     "release:stable:ice-build": "npm run ci:release:ice-build && nx release version --projects=ice-build --specifier=$npm_config_releaseType && npm run version && node scripts/finalize-release.cjs ice-build",
     "release:stable:ice-hotreloader": "npm run ci:release:ice-hotreloader && nx release version --projects=ice-hotreloader --specifier=$npm_config_releaseType && npm run version && node scripts/finalize-release.cjs ice-hotreloader",
-    
     "// Changelog operations": "",
     "changelog:ice-build": "conventional-changelog -p angular -i ice-build/CHANGELOG.md -s --commit-path ice-build",
     "changelog:ice-hotreloader": "conventional-changelog -p angular -i ice-hotreloader/CHANGELOG.md -s --commit-path ice-hotreloader",
-
     "// Dry run operations": "",
     "dry-run:ice-build": "node scripts/release-dry-run.cjs --package=ice-build --type=patch",
     "dry-run:ice-build:alpha": "node scripts/release-dry-run.cjs --package=ice-build --type=alpha",
@@ -74,22 +66,27 @@
     "npm-run-all": "^4.1.5"
   },
   "devDependencies": {
-    "@nx/js": "^20.8.1",
+    "@nx/js": "^22.1.1",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^11.0.2",
+    "@semantic-release/github": "^12.0.2",
     "conventional-changelog-cli": "^5.0.0",
-    "cross-env": "^7.0.3",
-    "eslint": "^8.57.0",
-    "globals": "^16.0.0",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0",
     "semantic-release-monorepo": "^8.0.2",
-    "typescript-eslint": "^8.31.1"
+    "typescript-eslint": "^8.48.0",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
-    "eslint": "^8.57.0",
-    "@rushstack/eslint-config": "^4.3.0"
+    "@rushstack/eslint-config": "^4.3.0",
+    "eslint": "^8.57.0"
+  },
+  "overrides": {
+    "@conventional-changelog/git-client": "^2.5.1"
   },
   "resolutions": {
-    "eslint": "^8.57.0"
+    "eslint": "^8.57.0",
+    "@conventional-changelog/git-client": "^2.5.1"
   }
 }

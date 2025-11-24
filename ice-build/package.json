@@ -34,23 +34,23 @@
   },
   "dependencies": {
     "@n8d/ice-hotreloader": "0.0.5",
-    "autoprefixer": "^10.4.21",
-    "chalk": "^5.4.1",
+    "autoprefixer": "^10.4.22",
+    "chalk": "^5.6.2",
     "chokidar": "^4.0.3",
-    "commander": "^13.1.0",
-    "esbuild": "^0.25.3",
-    "glob": "^11.0.2",
+    "commander": "^14.0.2",
+    "esbuild": "^0.27.0",
+    "glob": "^13.0.0",
     "lodash.debounce": "^4.0.8",
-    "path-scurry": "^2.0.0",
-    "postcss": "^8.5.3",
-    "sass": "^1.87.0"
+    "path-scurry": "^2.0.1",
+    "postcss": "^8.5.6",
+    "sass": "^1.94.2"
   },
   "devDependencies": {
-    "@types/estree": "^1.0.7",
+    "@types/estree": "^1.0.8",
     "@types/lodash.debounce": "^4.0.6",
-    "@types/node": "^22.15.3",
-    "typescript": "^5.8.3",
-    "vitest": "^3.1.2"
+    "@types/node": "^22.19.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   },
   "repository": {
     "type": "git",
