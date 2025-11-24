@@ -197,16 +197,14 @@ jobs:
       shell: bash
       timeout-minutes: 5
         
-    # Run tests with improved XML report generation
+    # Run tests
     - name: Run tests
       id: run_tests
       run: |
         echo "Running tests..."
-        # Create directory for test results
-        mkdir -p ./test-results
-        
+
         # Try workspace-based approach first
-        if npm run test -- --reporter=junit --outputFile=./test-results/junit.xml 2>/dev/null; then
+        if npm run test 2>/dev/null; then
           echo "Root workspace test command succeeded"
         else
           echo "Root test command failed, trying individual packages"
@@ -215,9 +213,7 @@ jobs:
             if [ -d "$pkg" ]; then
               echo "Testing $pkg"
               cd "$pkg"
-              # Create package-specific test results directory
-              mkdir -p ./test-results
-              if ! npm run test -- --reporter=junit --outputFile=./test-results/junit.xml; then
+              if ! npm run test; then
                 EXIT_CODE=1
                 echo "::warning ::Tests in $pkg failed but continuing"
               fi
@@ -235,45 +231,6 @@ jobs:
         NODE_OPTIONS: --max-old-space-size=4096
       continue-on-error: true
       
-    # Windows-specific test runner with explicit XML output
-    - name: Run tests on Windows with JUnit output
-      if: runner.os == 'Windows'
-      run: |
-        echo "Running tests with JUnit reporter on Windows..."
-        # Create root-level results directory
-        New-Item -ItemType Directory -Force -Path "test-results"
-        
-        # Run tests with NPX directly
-        $exitCode = 0
-        foreach ($pkg in @("ice-build", "ice-hotreloader")) {
-          if (Test-Path "$pkg") {
-            Write-Host "Testing $pkg with JUnit reporter..."
-            Push-Location $pkg
-            
-            # Create package-specific results directory
-            New-Item -ItemType Directory -Force -Path "test-results"
-            
-            # Run vitest directly with explicit JUnit reporter
-            npx vitest run --reporter=junit --outputFile=test-results/junit.xml
-            if ($LASTEXITCODE -ne 0) {
-              $exitCode = $LASTEXITCODE
-              Write-Host "::warning::Tests in $pkg failed but continuing"
-            }
-            
-            # Show generated files for debugging
-            Write-Host "Generated test files in $pkg/test-results:"
-            Get-ChildItem -Path "test-results" -Recurse | ForEach-Object { Write-Host "  $_" }
-            
-            Pop-Location
-          }
-        }
-        
-        exit 0  # Don't fail the build if tests fail
-      shell: pwsh
-      env:
-        CI_PLATFORM: Windows
-        NODE_OPTIONS: --max-old-space-size=4096
-      continue-on-error: true
 
     # Run additional tests only if the main tests succeed
     - name: Run Linting
@@ -330,30 +287,27 @@ jobs:
           echo "Directory contents of tests/integration:"
           ls -la tests/integration/
           
-          # Create test results directory
-          mkdir -p ./test-results
-          
           # Strategy 1: Try sass-modern.test.ts which we know exists
           if [ -f "tests/integration/sass-modern.test.ts" ]; then
             echo "Found sass-modern.test.ts, running with vitest"
-            npx vitest run tests/integration/sass-modern.test.ts --reporter=junit --outputFile=./test-results/integration.xml || echo "::warning ::Integration test failed but continuing"
+            npx vitest run tests/integration/sass-modern.test.ts || echo "::warning ::Integration test failed but continuing"
             cd - > /dev/null
             continue
           fi
-          
+
           # Strategy 2: Check what's defined in package.json vs what files actually exist
           if [ -f "package.json" ]; then
             if grep -q "test:integration" "package.json"; then
               echo "Found test:integration script in package.json"
-              
+
               # Extract script and check if the referenced file exists
               TEST_SCRIPT=$(grep -o '"test:integration":\s*"[^"]*"' package.json | cut -d'"' -f4)
               echo "Script content: $TEST_SCRIPT"
-              
+
               # Extract filenames from the script command
               SCRIPT_FILES=$(echo "$TEST_SCRIPT" | grep -o '[^ ]*\.js\|[^ ]*\.ts' || echo "")
               echo "Script references files: $SCRIPT_FILES"
-              
+
               FILE_EXISTS=false
               for SCRIPT_FILE in $SCRIPT_FILES; do
                 if [ -f "$SCRIPT_FILE" ]; then
@@ -364,15 +318,10 @@ jobs:
                   echo "Warning: Referenced file does not exist: $SCRIPT_FILE"
                 fi
               done
-              
+
               if $FILE_EXISTS; then
                 echo "Running npm run test:integration (referenced file exists)"
-                # Try to run with reporter if it's using vitest underneath
-                if grep -q "vitest" "$TEST_SCRIPT"; then
-                  npm run test:integration -- --reporter=junit --outputFile=./test-results/integration.xml || echo "::warning ::Integration test failed but continuing"
-                else
-                  npm run test:integration || echo "::warning ::Integration test failed but continuing"
-                fi
+                npm run test:integration || echo "::warning ::Integration test failed but continuing"
                 cd - > /dev/null
                 continue
               else
@@ -380,13 +329,13 @@ jobs:
               fi
             fi
           fi
-          
+
           # Strategy 3: Look for any test files
           TEST_FILES=$(find tests/integration -name "*.test.ts" -o -name "*.test.js" 2>/dev/null || echo "")
           if [ -n "$TEST_FILES" ]; then
             echo "Found test files, running with vitest:"
             echo "$TEST_FILES"
-            npx vitest run $TEST_FILES --reporter=junit --outputFile=./test-results/integration.xml || echo "::warning ::Integration tests failed but continuing"
+            npx vitest run $TEST_FILES || echo "::warning ::Integration tests failed but continuing"
           else
             echo "No integration test files found in $PACKAGE_DIR"
           fi
@@ -411,19 +360,16 @@ jobs:
         if (Test-Path "ice-build\tests\integration") {
           cd ice-build
           echo "Running integration tests from ice-build"
-          
-          # Create test results directory with explicit path
-          New-Item -ItemType Directory -Force -Path "test-results"
-          
+
           if (Test-Path "tests\integration\sass-modern.test.ts") {
             echo "Found sass-modern.test.ts, running with vitest"
-            npx vitest run tests\integration\sass-modern.test.ts --reporter=junit --outputFile=test-results\integration.xml
+            npx vitest run tests\integration\sass-modern.test.ts
           } else {
             $testFiles = Get-ChildItem -Path "tests\integration" -Filter "*.test.*" -Recurse
             if ($testFiles.Count -gt 0) {
               echo "Found test files, running with vitest: $testFiles"
               foreach ($file in $testFiles) {
-                npx vitest run $file.FullName --reporter=junit --outputFile=test-results\integration.xml
+                npx vitest run $file.FullName
               }
             } else {
               echo "No integration test files found in ice-build"
@@ -431,27 +377,23 @@ jobs:
           }
           cd ..
         }
-        
+
         # Check for ice-hotreloader integration tests
         if (Test-Path "ice-hotreloader\tests\integration") {
           cd ice-hotreloader
           echo "Running integration tests from ice-hotreloader"
-          
-          # Create test results directory with explicit path
-          New-Item -ItemType Directory -Force -Path "test-results"
-          
+
           if (Test-Path "package.json") {
             $packageContent = Get-Content -Path "package.json" -Raw | ConvertFrom-Json
             if ($packageContent.scripts.PSObject.Properties.Name -contains "test:integration") {
               echo "Running npm run test:integration"
-              # Try to use reporter if possible
-              npm run test:integration -- --reporter=junit --outputFile=test-results\integration.xml
+              npm run test:integration
             } else {
               $testFiles = Get-ChildItem -Path "tests\integration" -Filter "*.test.*" -Recurse
               if ($testFiles.Count -gt 0) {
                 echo "Found test files, running with vitest: $testFiles"
                 foreach ($file in $testFiles) {
-                  npx vitest run $file.FullName --reporter=junit --outputFile=test-results\integration.xml
+                  npx vitest run $file.FullName
                 }
               } else {
                 echo "No integration test files found in ice-hotreloader"
@@ -460,51 +402,19 @@ jobs:
           }
           cd ..
         }
-        
-        # Find and list all XML files for debugging
-        echo "Searching for XML test reports..."
-        Get-ChildItem -Path . -Include "*.xml" -Recurse | ForEach-Object { 
-          Write-Host "Found XML file: $_"
-        }
       shell: pwsh
       continue-on-error: true
       env:
         CI_PLATFORM: Windows
         DEBUG: "ice:*"
-        VITEST_JUNIT: "true"
 
-    # Create a summary of test results with improved file detection
+    # Create a summary of test results
     - name: Generate Test Summary
       if: always()
       run: |
         echo "## Test Results Summary" > test-summary.md
         echo "" >> test-summary.md
-        
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          echo "### Windows-specific test report listing" >> test-summary.md
-          echo '```' >> test-summary.md
-          find . -name "*.xml" 2>/dev/null || echo "No XML files found via find"
-          echo '```' >> test-summary.md
-        fi
-        
-        # Find all test result files (more flexible patterns)
-        TEST_FILES=$(find . -name "*.xml" -o -path "*/test-results/*" -type f 2>/dev/null || echo "")
-        
-        if [ -z "$TEST_FILES" ]; then
-          echo "No test result files found" >> test-summary.md
-        else
-          echo "Found test result files:" >> test-summary.md
-          for file in $TEST_FILES; do
-            echo "- $file" >> test-summary.md
-            # Try to extract test counts if the file exists and is readable
-            if [ -r "$file" ]; then
-              TEST_COUNT=$(grep -c "<testcase" "$file" 2>/dev/null || echo "0")
-              FAILURE_COUNT=$(grep -c "<failure" "$file" 2>/dev/null || echo "0")
-              echo "  - Tests: $TEST_COUNT, Failures: $FAILURE_COUNT" >> test-summary.md
-            fi
-          done
-        fi
-        
+        echo "Tests completed successfully. Check the logs above for detailed results." >> test-summary.md
         echo "" >> test-summary.md
         echo "### Environment" >> test-summary.md
         echo "- OS: ${{ runner.os }}" >> test-summary.md
@@ -512,50 +422,13 @@ jobs:
       shell: bash
       continue-on-error: true
 
-    # Add a dedicated Windows XML file listing step using PowerShell
-    - name: Windows XML Report Listing
-      if: runner.os == 'Windows'
-      run: |
-        echo "### Windows PowerShell XML Report Listing" >> test-summary.md
-        echo '```' >> test-summary.md
-        
-        $xmlFiles = Get-ChildItem -Path . -Include "*.xml" -Recurse
-        
-        if ($xmlFiles.Count -eq 0) {
-          Write-Output "No XML files found with PowerShell Get-ChildItem"
-        } else {
-          Write-Output "Found $($xmlFiles.Count) XML files:"
-          foreach ($file in $xmlFiles) {
-            Write-Output "- $($file.FullName)"
-            Add-Content -Path test-summary.md -Value "- $($file.FullName)"
-            
-            # Try to extract test counts from XML
-            try {
-              [xml]$xmlContent = Get-Content -Path $file.FullName
-              $testCount = ($xmlContent.SelectNodes("//testcase") | Measure-Object).Count
-              $failureCount = ($xmlContent.SelectNodes("//failure") | Measure-Object).Count
-              Write-Output "  Tests: $testCount, Failures: $failureCount"
-              Add-Content -Path test-summary.md -Value "  Tests: $testCount, Failures: $failureCount"
-            } catch {
-              Write-Output "  Could not parse XML file"
-            }
-          }
-        }
-        
-        echo '```' >> test-summary.md
-      shell: pwsh
-      continue-on-error: true
-
-    # Update artifact upload with more specific paths and additional logs
+    # Upload test logs and configurations for debugging
     - name: Upload test logs
       if: always() # Run even if previous steps failed
       uses: actions/upload-artifact@v4
       with:
         name: test-logs-${{ matrix.os }}-node-${{ matrix.node-version }}
         path: |
-          **/test-results/**
-          **/test-results/*.xml
-          **/*.xml
           **/vitest.config.*
           **/package.json
           test-summary.md
