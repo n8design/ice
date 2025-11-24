@@ -14,7 +14,7 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "version": "0.7.0",
+  "version": "0.8.0",
   "bin": {
     "ice-build": "./dist/bin/ice-build.js"
   },
@@ -33,7 +33,7 @@
     "changelog": "node scripts/release.js"
   },
   "dependencies": {
-    "@n8d/ice-hotreloader": "0.0.5",
+    "@n8d/ice-hotreloader": "0.1.0",
     "autoprefixer": "^10.4.22",
     "chalk": "^5.6.2",
     "chokidar": "^4.0.3",
