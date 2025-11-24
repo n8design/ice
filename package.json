@@ -78,15 +78,10 @@
     "typescript-eslint": "^8.48.0",
     "vitest": "^3.2.4"
   },
-  "peerDependencies": {
-    "@rushstack/eslint-config": "^4.3.0",
-    "eslint": "^8.57.0"
-  },
   "overrides": {
     "@conventional-changelog/git-client": "^2.5.1"
   },
   "resolutions": {
-    "eslint": "^8.57.0",
     "@conventional-changelog/git-client": "^2.5.1"
   }
 }

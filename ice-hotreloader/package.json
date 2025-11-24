@@ -67,8 +67,5 @@
       "publishable": true,
       "access": "public"
     }
-  },
-  "peerDependencies": {
-    "eslint": "^8.57.0"
   }
 }
