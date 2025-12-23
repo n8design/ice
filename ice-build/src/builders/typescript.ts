@@ -196,25 +196,8 @@ export class TypeScriptBuilder implements Builder {
 
   // Add a method to handle the ts/ to js/ directory structure transformation during build
   private transformOutputPath(buildOptions: esbuild.BuildOptions): esbuild.BuildOptions {
-    // Override esbuild's outfile with our own path transformation
-    const outfileTransformer: esbuild.Plugin = {
-      name: 'outfile-transformer',
-      setup(build) {
-        build.onResolve({ filter: /\.ts$/ }, args => {
-          // Check if the file is in a ts/ directory
-          if (args.path.includes('/ts/')) {
-            const jsPath = args.path.replace('/ts/', '/js/');
-            return { path: jsPath, external: false };
-          }
-          return { path: args.path };
-        });
-      }
-    };
-
-    // Add our transformer plugin
-    if (!buildOptions.plugins) buildOptions.plugins = [];
-    buildOptions.plugins.push(outfileTransformer);
-
+    // This plugin is not needed anymore - the outfile is already correctly set
+    // Keeping the method for backward compatibility but it just returns the options as-is
     return buildOptions;
   }
 
