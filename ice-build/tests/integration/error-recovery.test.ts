@@ -218,4 +218,98 @@ describe('Error Recovery & Config Edge Cases', () => {
     const conflictingBuilder = new MockBuilder(conflictingConfig);
     expect(conflictingBuilder.config.output).toEqual(conflictingConfig.output);
   });
+
+  it('should handle cascading build failures gracefully', async () => {
+    // Set up failures for multiple files
+    mockBuilder.setFailure('src/file1.ts', true);
+    mockBuilder.setFailure('src/file2.scss', true);
+    
+    // Try to build all - should fail
+    try {
+      await mockBuilder.buildAll();
+      // Should not reach here
+      expect(true).toBe(false);
+    } catch (err) {
+      // Expected to throw
+      expect(err).toBeDefined();
+    }
+    
+    // All files should have been attempted
+    expect(mockBuilder.buildResults.has('src/file1.ts')).toBe(true);
+    expect(mockBuilder.buildResults.has('src/file2.scss')).toBe(true);
+    expect(mockBuilder.buildResults.has('src/file3.html')).toBe(true);
+    
+    // Only file3 should have succeeded
+    expect(mockBuilder.wasBuildSuccessful('src/file1.ts')).toBe(false);
+    expect(mockBuilder.wasBuildSuccessful('src/file2.scss')).toBe(false);
+    expect(mockBuilder.wasBuildSuccessful('src/file3.html')).toBe(true);
+  });
+  
+  it('should handle rapid error recovery during hot reload', async () => {
+    // Simulate rapid file changes with errors and fixes
+    const testFile = 'src/rapid-change.scss';
+    
+    // Start with failure
+    mockBuilder.setFailure(testFile, true);
+    
+    // First change - fails
+    try {
+      await mockBuilder.processChange(testFile);
+    } catch (err) {
+      // Expected
+    }
+    expect(mockBuilder.wasBuildSuccessful(testFile)).toBe(false);
+    
+    // Fix the file
+    mockBuilder.setFailure(testFile, false);
+    mockBuilder.resetResults();
+    
+    // Rapid subsequent changes - should all succeed
+    await mockBuilder.processChange(testFile);
+    expect(mockBuilder.wasBuildSuccessful(testFile)).toBe(true);
+    
+    await mockBuilder.processChange(testFile);
+    expect(mockBuilder.wasBuildSuccessful(testFile)).toBe(true);
+    
+    await mockBuilder.processChange(testFile);
+    expect(mockBuilder.wasBuildSuccessful(testFile)).toBe(true);
+  });
+  
+  it('should handle network connectivity errors in hot reload server simulation', async () => {
+    // Mock a hot reload server with network issues
+    class NetworkFailingMockBuilder extends MockBuilder {
+      networkFailures = 0;
+      maxNetworkFailures = 2;
+      
+      async notifyHotReload(filePath: string) {
+        if (this.networkFailures < this.maxNetworkFailures) {
+          this.networkFailures++;
+          throw new Error('Network connection failed');
+        }
+        // Success after retries
+        return true;
+      }
+    }
+    
+    const networkBuilder = new NetworkFailingMockBuilder(mockConfig);
+    
+    // First attempts should fail
+    try {
+      await networkBuilder.notifyHotReload('test.css');
+      expect(true).toBe(false); // Should not reach here
+    } catch (err) {
+      expect((err as Error).message).toContain('Network connection failed');
+    }
+    
+    try {
+      await networkBuilder.notifyHotReload('test.css');
+      expect(true).toBe(false); // Should not reach here
+    } catch (err) {
+      expect((err as Error).message).toContain('Network connection failed');
+    }
+    
+    // Third attempt should succeed
+    const result = await networkBuilder.notifyHotReload('test.css');
+    expect(result).toBe(true);
+  });
 });

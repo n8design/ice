@@ -448,4 +448,163 @@ describe('SCSS Forward Modules', () => {
       // The issue may be with how we construct the test dependency graph
     });
   });
+
+  // Tests for circular @forward dependencies
+  describe('Circular @forward dependencies', () => {
+    let circularBuilder: SCSSBuilder;
+
+    beforeEach(() => {
+      const config = {
+        input: { 
+          path: 'source', 
+          ts: [], 
+          scss: [] 
+        },
+        output: 'public'
+      };
+      circularBuilder = new SCSSBuilder(config);
+      (circularBuilder as any).verboseLogging = true;
+    });
+
+    it('should handle circular @forward references without infinite loops', () => {
+      // Create a circular @forward scenario:
+      // _indexA.scss forwards _indexB.scss
+      // _indexB.scss forwards _indexC.scss  
+      // _indexC.scss forwards _indexA.scss (creates cycle)
+      
+      const indexAPath = '/source/scss/modules/_indexA.scss';
+      const indexBPath = '/source/scss/modules/_indexB.scss';
+      const indexCPath = '/source/scss/modules/_indexC.scss';
+      const componentPath = '/source/scss/modules/_component.scss';
+      const mainPath = '/source/scss/main.scss';
+      
+      const circularGraph = new Map();
+      
+      // Component that gets forwarded through circular chain
+      circularGraph.set(componentPath, {
+        importers: new Set([indexAPath]),
+        uses: new Set()
+      });
+      
+      // Index A forwards component and is forwarded by Index C (circular)
+      circularGraph.set(indexAPath, {
+        importers: new Set([indexCPath]), // Circular reference
+        uses: new Set([componentPath])
+      });
+      
+      // Index B forwards Index A and is forwarded by Index A (part of cycle)
+      circularGraph.set(indexBPath, {
+        importers: new Set([indexAPath]),
+        uses: new Set([indexCPath])
+      });
+      
+      // Index C forwards Index B and creates circular reference to Index A
+      circularGraph.set(indexCPath, {
+        importers: new Set([indexBPath, mainPath]),
+        uses: new Set([indexAPath]) // Creates circular reference
+      });
+      
+      // Main file uses Index C
+      circularGraph.set(mainPath, {
+        importers: new Set(),
+        uses: new Set([indexCPath])
+      });
+      
+      (circularBuilder as any).dependencyGraph = circularGraph;
+      
+      // Test that component can find main as parent without infinite loop
+      const parents = circularBuilder.getParentFiles(componentPath);
+      
+      // Should find main.scss as parent
+      expect(parents).toContain(mainPath);
+      
+      // Should not hang or throw errors due to circular references
+      expect(parents.length).toBeGreaterThan(0);
+    });
+
+    it('should handle deeply nested @forward chains', () => {
+      // Test scenario: component -> index1 -> index2 -> index3 -> main
+      // Where each index forwards the previous one
+      
+      const componentPath = '/source/scss/deep/modules/_component.scss';
+      const index1Path = '/source/scss/deep/modules/_index1.scss';
+      const index2Path = '/source/scss/deep/modules/_index2.scss';
+      const index3Path = '/source/scss/deep/modules/_index3.scss';
+      const mainPath = '/source/scss/deep/main.scss';
+      
+      const deepGraph = new Map();
+      
+      deepGraph.set(componentPath, {
+        importers: new Set([index1Path]),
+        uses: new Set()
+      });
+      
+      deepGraph.set(index1Path, {
+        importers: new Set([index2Path]),
+        uses: new Set([componentPath])
+      });
+      
+      deepGraph.set(index2Path, {
+        importers: new Set([index3Path]),
+        uses: new Set([index1Path])
+      });
+      
+      deepGraph.set(index3Path, {
+        importers: new Set([mainPath]),
+        uses: new Set([index2Path])
+      });
+      
+      deepGraph.set(mainPath, {
+        importers: new Set(),
+        uses: new Set([index3Path])
+      });
+      
+      (circularBuilder as any).dependencyGraph = deepGraph;
+      
+      // Component should be able to trace through the entire chain to find main
+      const parents = circularBuilder.getParentFiles(componentPath);
+      expect(parents).toContain(mainPath);
+    });
+
+    it('should handle organisms/mat-mgmt pattern with @forward', () => {
+      // Test the specific pattern mentioned in the fix: organisms/mat-mgmt/_index.scss
+      
+      const matMgmtComponent = '/source/scss/03-organisms/mat-mgmt/_component.scss';
+      const matMgmtIndex = '/source/scss/03-organisms/mat-mgmt/_index.scss';
+      const organismsIndex = '/source/scss/03-organisms/_index.scss';
+      const mainPath = '/source/scss/main.scss';
+      
+      const organismsGraph = new Map();
+      
+      // Component in mat-mgmt
+      organismsGraph.set(matMgmtComponent, {
+        importers: new Set([matMgmtIndex]),
+        uses: new Set()
+      });
+      
+      // mat-mgmt index forwards its components
+      organismsGraph.set(matMgmtIndex, {
+        importers: new Set([organismsIndex]),
+        uses: new Set([matMgmtComponent])
+      });
+      
+      // organisms index forwards all sub-module indexes
+      organismsGraph.set(organismsIndex, {
+        importers: new Set([mainPath]),
+        uses: new Set([matMgmtIndex])
+      });
+      
+      // main imports organisms
+      organismsGraph.set(mainPath, {
+        importers: new Set(),
+        uses: new Set([organismsIndex])
+      });
+      
+      (circularBuilder as any).dependencyGraph = organismsGraph;
+      
+      // The mat-mgmt component should be able to find main as its parent
+      const parents = circularBuilder.getParentFiles(matMgmtComponent);
+      expect(parents).toContain(mainPath);
+    });
+  });
 });
