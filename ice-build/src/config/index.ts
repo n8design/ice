@@ -173,7 +173,16 @@ export class ConfigManager {
     } else {
       logger.debug('No user hotreload options found.');
     }
-    
+
+    // Set watch options
+    if (userConfig.watch) {
+      logger.debug(`User watch options found: ${JSON.stringify(userConfig.watch, null, 2)}`);
+      this.config.watch = { ...userConfig.watch };
+      logger.debug(`Applied watch options: ${JSON.stringify(this.config.watch, null, 2)}`);
+    } else {
+      logger.debug('No user watch options found.');
+    }
+
     logger.debug(`Final applied config: ${JSON.stringify(this.config, null, 2)}`);
   }
 
