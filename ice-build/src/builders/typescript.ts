@@ -227,7 +227,6 @@ export class TypeScriptBuilder implements Builder {
       logger.info(`Output will be written to: ${outputPath}`);
       const buildOptions: esbuild.BuildOptions = {
         entryPoints: [filePath],
-        outdir: path.dirname(outputPath),
         outfile: outputPath,
         format: 'esm',
         ...this.config.esbuild,
